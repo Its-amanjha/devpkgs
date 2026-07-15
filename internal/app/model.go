@@ -73,6 +73,12 @@ type Model struct {
 
 	themeOverlay bool
 	themeCursor  int
+	actionOverlay bool
+	pendingAction pm.Action
+	pendingTab    int
+	pendingPackage string
+	actionStatus  string
+	outdatedOnly  bool
 
 	sparklineHistory []float64
 }
@@ -159,36 +165,28 @@ func darkenHex(hex string, factor float64) lipgloss.Color {
 
 func (m Model) applyFilter() Model {
 	if m.allMode {
-		if m.searchQuery == "" {
-			m.allDisplayPackages = m.allPackages
-		} else {
-			query := strings.ToLower(m.searchQuery)
-			var filtered []string
-			for _, pkg := range m.allPackages {
-				if fuzzyMatch(pkg, query) {
-					filtered = append(filtered, pkg)
-				}
+		query := strings.ToLower(m.searchQuery)
+		var filtered []string
+		for _, pkg := range m.allPackages {
+			if (!m.outdatedOnly || m.isOutdated(m.tabForPackage(pkg), pkg)) && (query == "" || fuzzyMatch(pkg, query)) {
+				filtered = append(filtered, pkg)
 			}
-			m.allDisplayPackages = filtered
 		}
+		m.allDisplayPackages = filtered
 		if m.allCursor >= len(m.allDisplayPackages) {
 			m.allCursor = max(0, len(m.allDisplayPackages)-1)
 		}
 		return m
 	}
 	st := &m.states[m.activeTab]
-	if m.searchQuery == "" {
-		st.displayPackages = st.packages
-	} else {
-		query := strings.ToLower(m.searchQuery)
-		var filtered []string
-		for _, pkg := range st.packages {
-			if fuzzyMatch(pkg, query) {
-				filtered = append(filtered, pkg)
-			}
+	query := strings.ToLower(m.searchQuery)
+	var filtered []string
+	for _, pkg := range st.packages {
+		if (!m.outdatedOnly || m.isOutdated(m.activeTab, pkg)) && (query == "" || fuzzyMatch(pkg, query)) {
+			filtered = append(filtered, pkg)
 		}
-		st.displayPackages = filtered
 	}
+	st.displayPackages = filtered
 	if st.cursor >= len(st.displayPackages) {
 		st.cursor = max(0, len(st.displayPackages)-1)
 	}
@@ -196,6 +194,61 @@ func (m Model) applyFilter() Model {
 		m = m.updateBrewInfo()
 	}
 	return m
+}
+
+func (m Model) tabForPackage(packageName string) int {
+	origin := m.allPackageOrigin[packageName]
+	for i, tab := range m.tabs {
+		if tab.Name() == origin {
+			return i
+		}
+	}
+	return -1
+}
+
+func (m Model) isOutdated(tabIndex int, packageName string) bool {
+	if tabIndex < 0 {
+		return false
+	}
+	installed := m.states[tabIndex].versions[packageName]
+	latest := ""
+	switch m.tabs[tabIndex].Name() {
+	case "brew":
+		if info := m.states[tabIndex].Brew; info != nil && info.FormulaeMap[packageName].Versions.Stable != "" {
+			latest = info.FormulaeMap[packageName].Versions.Stable
+		}
+	case "npm":
+		if info := m.states[tabIndex].NpmDetails[packageName]; info != nil {
+			latest = info.Version
+		}
+	case "pip":
+		if info := m.states[tabIndex].PipDetails[packageName]; info != nil {
+			latest = info.Version
+		}
+	}
+	return installed != "" && latest != "" && installed != latest
+}
+
+func (m Model) selectedPackage() (int, string, bool) {
+	if m.allMode {
+		if m.allCursor >= len(m.allDisplayPackages) { return 0, "", false }
+		name := m.allDisplayPackages[m.allCursor]
+		index := m.tabForPackage(name)
+		return index, name, index >= 0
+	}
+	state := m.states[m.activeTab]
+	if state.cursor >= len(state.displayPackages) { return 0, "", false }
+	return m.activeTab, state.displayPackages[state.cursor], true
+}
+
+func (m Model) refresh() (Model, tea.Cmd) {
+	commands := make([]tea.Cmd, 0, len(m.tabs))
+	for i, tab := range m.tabs {
+		m.states[i].loading = true
+		m.states[i].err = nil
+		commands = append(commands, tab.ListInstalled())
+	}
+	return m, tea.Batch(commands...)
 }
 
 func (m Model) updateBrewInfo() Model {
@@ -252,11 +305,7 @@ func (m Model) buildAllPackages() Model {
 		}
 	}
 	sort.Strings(m.allPackages)
-	m.allDisplayPackages = m.allPackages
-	if m.allCursor >= len(m.allDisplayPackages) {
-		m.allCursor = max(0, len(m.allDisplayPackages)-1)
-	}
-	return m
+	return m.applyFilter()
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -333,6 +382,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				st.loading = false
 				m = m.updateBrewInfo()
 			}
+			m = m.applyFilter()
 		}
 
 	case pm.BrewFormulaeErrMsg:
@@ -358,6 +408,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		st.NpmDetailsReady = true
+		m = m.applyFilter()
 
 	case pm.PipAllDetailsMsg:
 		st := &m.states[2]
@@ -369,6 +420,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		st.PipDetailsReady = true
+		m = m.applyFilter()
+
+	case pm.ActionMsg:
+		if msg.Err != nil {
+			m.actionStatus = fmt.Sprintf("%s failed for %s: %v", msg.Action, msg.PackageName, msg.Err)
+			return m, nil
+		}
+		m.actionStatus = fmt.Sprintf("%s completed for %s", msg.Action, msg.PackageName)
+		return m.refresh()
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -396,6 +456,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tickCmd()
 
 	case tea.KeyMsg:
+		if m.actionOverlay {
+			switch msg.String() {
+			case "esc", "n":
+				m.actionOverlay = false
+				return m, nil
+			case "enter", "y":
+				m.actionOverlay = false
+				return m, m.tabs[m.pendingTab].RunAction(m.pendingPackage, m.pendingAction)
+			default:
+				return m, nil
+			}
+		}
 		if m.themeOverlay {
 			switch msg.String() {
 			case "esc", "t":
@@ -497,6 +569,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.searchActive = true
 			m.searchQuery = ""
 
+		case "r":
+			return m.refresh()
+
+		case "o":
+			m.outdatedOnly = !m.outdatedOnly
+			m = m.applyFilter()
+
+		case "u", "x":
+			if tabIndex, packageName, ok := m.selectedPackage(); ok {
+				m.pendingTab = tabIndex
+				m.pendingPackage = packageName
+				m.pendingAction = pm.Upgrade
+				if msg.String() == "x" { m.pendingAction = pm.Remove }
+				m.actionOverlay = true
+			}
+
 		case "left":
 			if m.allMode {
 				return m, nil
@@ -515,7 +603,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.allMode = true
 				m.searchActive = false
 				m.searchQuery = ""
-				return m, nil
+				return m.applyFilter(), nil
 			}
 
 		case "right":
@@ -524,6 +612,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.activeTab = 0
 				m.searchActive = false
 				m.searchQuery = ""
+				m = m.applyFilter()
 				return m, m.selectPackageCmd()
 			}
 			if m.activeTab < len(m.tabs)-1 {
@@ -661,6 +750,9 @@ func (m Model) View() string {
 
 	if m.themeOverlay {
 		return m.renderThemeOverlay()
+	}
+	if m.actionOverlay {
+		return m.renderActionOverlay()
 	}
 
 	return rendered
@@ -1335,10 +1427,16 @@ func (m Model) renderFooter() string {
 	if currentTheme != nil {
 		themeName = currentTheme.Name
 	}
-	help := FooterStyle.Render(
-		fmt.Sprintf("[← → tabs]  [/ search]  [↑↓ navigate]  [t theme  %s]  [q / ctrl+c quit]", themeName),
-	)
-	return countStr + apiErrMsg + "  " + help
+	help := FooterStyle.Render(fmt.Sprintf("[← → tabs] [/ search] [o outdated] [r refresh] [u upgrade] [x remove] [t theme %s] [q quit]", themeName))
+	status := ""
+	if m.actionStatus != "" { status = "  " + FooterStyle.Render(m.actionStatus) }
+	return countStr + apiErrMsg + status + "  " + help
+}
+
+func (m Model) renderActionOverlay() string {
+	action := string(m.pendingAction)
+	content := fmt.Sprintf("%s %q using %s?\n\nEnter/y: confirm   Esc/n: cancel", action, m.pendingPackage, m.tabs[m.pendingTab].Name())
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, renderPaneBox(60, "Confirm package action", content))
 }
 
 func (m Model) renderThemeOverlay() string {

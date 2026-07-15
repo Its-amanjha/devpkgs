@@ -1,4 +1,4 @@
-BINARY_NAME := pkgview
+BINARY_NAME := devpkgs
 BUILD_DIR := build
 
 .PHONY: build install run clean test lint

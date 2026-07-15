@@ -34,6 +34,13 @@ func (b *BrewManager) ListInstalled() tea.Cmd {
 	)
 }
 
+func (b *BrewManager) RunAction(packageName string, action Action) tea.Cmd {
+	if action == Remove {
+		return Run(packageName, action, "brew", "uninstall", packageName)
+	}
+	return Run(packageName, action, "brew", "upgrade", packageName)
+}
+
 type BrewListMsg struct {
 	Names             []string
 	Paths             map[string]string

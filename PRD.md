@@ -8,13 +8,14 @@ Give developers one fast terminal screen to browse packages installed through Ho
 
 - List globally installed npm and pip packages, plus Homebrew formulae.
 - Search, inspect package metadata, and switch colour themes.
-- Remain read-only: no package install, update, or removal commands.
+- Filter packages whose installed and latest versions differ.
+- Refresh package lists without restarting.
+- Upgrade or remove a selected Homebrew, npm, or pip package after explicit confirmation.
 
 ## Next release
 
-- Add an explicit package-action screen for update and removal.
-- Show the exact command and require confirmation before running it.
-- Report command success or failure in the UI.
+- Add Windows Package Manager (`winget`) support using a structured package source.
+- Show action output in the UI.
 
 ## Non-goals
 

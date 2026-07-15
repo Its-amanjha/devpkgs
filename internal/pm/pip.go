@@ -58,6 +58,18 @@ func (p *PipManager) ListInstalled() tea.Cmd {
 	}
 }
 
+func (p *PipManager) RunAction(packageName string, action Action) tea.Cmd {
+	cmd, prefix := p.resolveCmd()
+	if cmd == "" {
+		return func() tea.Msg { return ActionMsg{PackageName: packageName, Action: action, Err: fmt.Errorf("pip is not installed")} }
+	}
+	args := append(prefix, "install", "--upgrade", packageName)
+	if action == Remove {
+		args = append(prefix, "uninstall", "-y", packageName)
+	}
+	return Run(packageName, action, cmd, args...)
+}
+
 func (p *PipManager) resolveCmd() (string, []string) {
 	if _, err := exec.LookPath("pip"); err == nil {
 		return "pip", nil

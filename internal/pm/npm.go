@@ -58,6 +58,13 @@ func (n *NpmManager) ListInstalled() tea.Cmd {
 	}
 }
 
+func (n *NpmManager) RunAction(packageName string, action Action) tea.Cmd {
+	if action == Remove {
+		return Run(packageName, action, "npm", "uninstall", "-g", packageName)
+	}
+	return Run(packageName, action, "npm", "update", "-g", packageName)
+}
+
 type NpmDist struct {
 	UnpackedSize int64 `json:"unpackedSize"`
 }
