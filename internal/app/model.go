@@ -11,7 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"pkgview/internal/pm"
+	"devpkgs/internal/pm"
 )
 
 type BrewState struct {
@@ -670,7 +670,7 @@ func (m Model) updateSparkline() {
 }
 
 func (m Model) renderHeader() string {
-	label := lipgloss.NewStyle().Bold(true).Foreground(currentTheme.Primary).Render("pkgview — a terminal dashboard for everything you've installed ")
+	label := lipgloss.NewStyle().Bold(true).Foreground(currentTheme.Primary).Render("devpkgs — a terminal dashboard for everything you've installed ")
 
 	sparkText := ""
 	sparkW := min(20, max(1, (m.width-20)/3))
@@ -1499,7 +1499,7 @@ func (m Model) listViewFallback() string {
 	visibleHeight := m.height - 8
 
 	if m.allMode {
-		title = TitleStyle.Render(fmt.Sprintf("pkgview  (%d)", len(m.allPackages)))
+		title = TitleStyle.Render(fmt.Sprintf("devpkgs  (%d)", len(m.allPackages)))
 		start := 0
 		if m.allCursor >= visibleHeight {
 			start = m.allCursor - visibleHeight + 1
@@ -1546,7 +1546,7 @@ func (m Model) listViewFallback() string {
 		}
 	} else {
 		st := m.states[m.activeTab]
-		title = TitleStyle.Render(fmt.Sprintf("pkgview  (%d)", len(st.packages)))
+		title = TitleStyle.Render(fmt.Sprintf("devpkgs  (%d)", len(st.packages)))
 		start := 0
 		if st.cursor >= visibleHeight {
 			start = st.cursor - visibleHeight + 1

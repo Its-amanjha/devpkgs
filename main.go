@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"pkgview/internal/app"
+	"devpkgs/internal/app"
 )
 
 func main() {

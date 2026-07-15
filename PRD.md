@@ -1,4 +1,4 @@
-# Product Requirements: pkgview
+# Product Requirements: devpkgs
 
 ## Purpose
 

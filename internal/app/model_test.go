@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	"pkgview/internal/pm"
+	"devpkgs/internal/pm"
 )
 
 func TestOutdatedNpmPackage(t *testing.T) {

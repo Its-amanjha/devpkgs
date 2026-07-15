@@ -1,4 +1,4 @@
-module pkgview
+module devpkgs
 
 go 1.25.5
 
