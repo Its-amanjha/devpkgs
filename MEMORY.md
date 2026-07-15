@@ -7,5 +7,5 @@
 - The module is temporarily `pkgview`; change it to the final GitHub path before publishing.
 - Keep `LICENSE`: it contains the required MIT attribution for the original source.
 - Current scope supports browsing, refreshing, and confirmed upgrade/removal actions for Homebrew, npm, and pip.
-- `winget` is intentionally deferred: its current list command exposes no structured JSON output.
+- `winget` uses `winget export` JSON rather than parsing the terminal table; it lists packages recognised by WinGet.
 - Run locally with `go run .`; verify with `go build ./...`.

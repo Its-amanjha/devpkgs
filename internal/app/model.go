@@ -94,6 +94,7 @@ func New() Model {
 		pm.NewBrewManager(0),
 		pm.NewNpmManager(1),
 		pm.NewPipManager(2),
+		pm.NewWingetManager(3),
 	}
 	states := make([]TabState, len(managers))
 	for i, m := range managers {

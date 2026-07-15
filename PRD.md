@@ -6,7 +6,7 @@ Give developers one fast terminal screen to browse packages installed through Ho
 
 ## Current release
 
-- List globally installed npm and pip packages, plus Homebrew formulae.
+- List globally installed npm and pip packages, Homebrew formulae, and packages recognised by Windows Package Manager.
 - Search, inspect package metadata, and switch colour themes.
 - Filter packages whose installed and latest versions differ.
 - Refresh package lists without restarting.
@@ -14,7 +14,6 @@ Give developers one fast terminal screen to browse packages installed through Ho
 
 ## Next release
 
-- Add Windows Package Manager (`winget`) support using a structured package source.
 - Show action output in the UI.
 
 ## Non-goals

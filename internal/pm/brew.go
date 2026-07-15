@@ -28,6 +28,9 @@ func (b *BrewManager) TabLabel() string {
 }
 
 func (b *BrewManager) ListInstalled() tea.Cmd {
+	if _, err := exec.LookPath("brew"); err != nil {
+		return func() tea.Msg { return PackageListMsg{TabIndex: b.tabIndex} }
+	}
 	return tea.Batch(
 		b.fetchBrewList(),
 		b.fetchFormulae(),
