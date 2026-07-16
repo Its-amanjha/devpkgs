@@ -165,7 +165,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case pm.LogFinishMsg:
 		m.logActive = false
-		return m, nil
+		return m, ListenLogs(m.logChan)
 
 	case pm.ActionMsg:
 		if msg.Err != nil {

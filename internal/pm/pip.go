@@ -65,7 +65,14 @@ func (p *PipManager) ListInstalled() tea.Cmd {
 func (p *PipManager) RunAction(name string, action Action, programChan chan<- tea.Msg) tea.Cmd {
 	cmd, prefix := p.resolve()
 	if cmd == "" {
-		return func() tea.Msg { return ActionMsg{PackageName: name, Action: action, Manager: "pip", Err: fmt.Errorf("pip not found")} }
+		return func() tea.Msg {
+			go func() {
+				err := fmt.Errorf("pip not found")
+				programChan <- LogFinishMsg{Manager: "pip", Err: err}
+				programChan <- ActionMsg{PackageName: name, Action: action, Manager: "pip", Err: err}
+			}()
+			return nil
+		}
 	}
 	args := append(prefix, "install", "--upgrade", name)
 	if action == Remove {
