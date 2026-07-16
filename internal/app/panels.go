@@ -34,10 +34,21 @@ func (m Model) renderLeftPanel(width int, boxHeight int) string {
 		end = len(st.displayPackages)
 	}
 
+	showCheckboxes := len(st.selected) > 0
 	var listItems []string
 	for i := start; i < end; i++ {
 		pkg := st.displayPackages[i]
-		displayPkg := truncateString(pkg, innerWidth)
+		var displayPkg string
+		if showCheckboxes {
+			prefix := "[ ] "
+			if st.selected[pkg] {
+				prefix = "[✓] "
+			}
+			displayPkg = prefix + truncateString(pkg, max(0, innerWidth-4))
+		} else {
+			displayPkg = truncateString(pkg, innerWidth)
+		}
+
 		if i == st.cursor {
 			style := SelectedItemStyle.Width(innerWidth)
 			listItems = append(listItems, style.Render(displayPkg))

@@ -28,7 +28,14 @@ func (m Model) renderFooter() string {
 	if m.actionStatus != "" {
 		status = "  " + FooterStyle.Render(m.actionStatus)
 	}
-	return countStr + apiErrMsg + status + "  " + help
+
+	st := m.states[m.activeTab]
+	selectedStr := ""
+	if len(st.selected) > 0 {
+		selectedStr = "  " + FooterStyle.Render(fmt.Sprintf("%d selected", len(st.selected)))
+	}
+
+	return countStr + apiErrMsg + status + selectedStr + "  " + help
 }
 
 func (m Model) renderActionOverlay() string {

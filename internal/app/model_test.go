@@ -83,3 +83,41 @@ func TestSelectionAndToggle(t *testing.T) {
 	}
 }
 
+func TestCheckboxAndFooterRendering(t *testing.T) {
+	m := New()
+	m.allMode = false
+	m.activeTab = 0
+	m.width = 80
+	m.height = 24
+
+	m.states[0].packages = []string{"pkgA", "pkgB"}
+	m.states[0].displayPackages = []string{"pkgA", "pkgB"}
+	m.states[0].cursor = 0
+	m.states[0].loading = false
+
+	// Initially no checkboxes should be rendered
+	leftPanelStr := m.renderLeftPanel(40, 20)
+	if strings.Contains(leftPanelStr, "[ ]") || strings.Contains(leftPanelStr, "[✓]") {
+		t.Fatal("expected no checkboxes to render when selected map is empty")
+	}
+
+	// Select pkgA
+	m.states[0].selected["pkgA"] = true
+
+	// Now checkboxes should be rendered
+	leftPanelStr = m.renderLeftPanel(40, 20)
+	if !strings.Contains(leftPanelStr, "[✓] pkgA") {
+		t.Fatal("expected selected package pkgA to render with [✓] prefix")
+	}
+	if !strings.Contains(leftPanelStr, "[ ] pkgB") {
+		t.Fatal("expected unselected package pkgB to render with [ ] prefix")
+	}
+
+	// Footer should show the selection count
+	footerStr := m.renderFooter()
+	if !strings.Contains(footerStr, "1 selected") {
+		t.Fatal("expected footer to contain '1 selected'")
+	}
+}
+
+
