@@ -248,7 +248,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.logScrollOffset = 0
 				m.logScrollActive = false
 				m.logActive = true
-				m.logChan = make(chan tea.Msg, 100) // Fresh channel!
+				m.logChan = make(chan tea.Msg, 100)
+				cmd := m.tabs[m.pendingTab].RunAction(m.pendingPackage, m.pendingAction, m.logChan)
+				return m, tea.Batch(cmd, ListenLogs(m.logChan))
+			case "s":
+				m.actionOverlay = false
+				m.logLines = nil
+				m.logScrollOffset = 0
+				m.logScrollActive = false
+				m.logActive = true
+				m.logChan = make(chan tea.Msg, 100)
 				cmd := m.tabs[m.pendingTab].RunAction(m.pendingPackage, m.pendingAction, m.logChan)
 				return m, tea.Batch(cmd, ListenLogs(m.logChan))
 			default:
