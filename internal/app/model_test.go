@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"devpkgs/internal/pm"
 )
 
@@ -48,3 +50,36 @@ func TestLogOverlay(t *testing.T) {
 		t.Fatal("expected view to contain 'Installation Logs' when scrolling")
 	}
 }
+
+func TestSelectionAndToggle(t *testing.T) {
+	m := New()
+	m.allMode = false
+	m.activeTab = 0
+
+	m.states[0].packages = []string{"pkgA", "pkgB"}
+	m.states[0].displayPackages = []string{"pkgA", "pkgB"}
+	m.states[0].cursor = 0
+
+	if m.states[0].selected == nil {
+		t.Fatal("expected selected map to be initialized")
+	}
+
+	// Simulating space key press to toggle pkgA
+	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	if cmd != nil {
+		t.Fatal("expected no command on space toggle")
+	}
+	m = updatedModel.(Model)
+
+	if !m.states[0].selected["pkgA"] {
+		t.Fatal("expected pkgA to be selected after space key press")
+	}
+
+	// Press space again to toggle off
+	updatedModel, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	m = updatedModel.(Model)
+	if m.states[0].selected["pkgA"] {
+		t.Fatal("expected pkgA to be deselected after second space key press")
+	}
+}
+

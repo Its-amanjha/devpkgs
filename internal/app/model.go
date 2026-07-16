@@ -33,6 +33,7 @@ type TabState struct {
 	progress        float64
 	progressTarget  float64
 	versions        map[string]string
+	selected        map[string]bool
 
 	Brew            *BrewState
 	NpmDetails      map[string]*pm.NpmDetailData
@@ -117,6 +118,7 @@ func New() Model {
 		states[i] = TabState{
 			loading:        true,
 			progressTarget: target,
+			selected:       make(map[string]bool),
 		}
 		if m.Name() == "brew" {
 			states[i].Brew = &BrewState{}

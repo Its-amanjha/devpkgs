@@ -350,6 +350,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 
+		case " ":
+			if !m.allMode {
+				st := &m.states[m.activeTab]
+				if st.cursor < len(st.displayPackages) {
+					pkg := st.displayPackages[st.cursor]
+					if st.selected == nil {
+						st.selected = make(map[string]bool)
+					}
+					if st.selected[pkg] {
+						delete(st.selected, pkg)
+					} else {
+						st.selected[pkg] = true
+					}
+				}
+			}
+			return m, nil
+
 		case "t":
 			if m.allLoaded() {
 				m.themeOverlay = true
