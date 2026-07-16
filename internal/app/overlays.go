@@ -31,7 +31,7 @@ func (m Model) renderFooter() string {
 
 	st := m.states[m.activeTab]
 	selectedStr := ""
-	if len(st.selected) > 0 {
+	if !m.allMode && len(st.selected) > 0 {
 		selectedStr = "  " + FooterStyle.Render(fmt.Sprintf("%d selected", len(st.selected)))
 	}
 

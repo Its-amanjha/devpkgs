@@ -52,6 +52,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			st.packages = msg.Packages
 			st.displayPackages = msg.Packages
 			st.versions = msg.Versions
+			pruneSelected(st)
 			st.loading = false
 			tab := m.tabs[msg.TabIndex]
 			if tab.Name() == "npm" {
@@ -77,6 +78,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			st.Brew.InstalledVersions = msg.InstalledVersions
 			st.Brew.Sizes = msg.Sizes
 			st.Brew.BrewListDone = true
+			pruneSelected(st)
 			st.progressTarget = 0.85
 			if st.Brew.BrewFormulaeDone {
 				st.loading = false
@@ -371,6 +373,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 
+		case "l":
+			if len(m.logLines) > 0 && !m.logActive {
+				m.logOverlay = true
+			}
+			return m, nil
+
 		case " ":
 			if !m.allMode {
 				st := &m.states[m.activeTab]
@@ -549,4 +557,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func pruneSelected(st *TabState) {
+	if len(st.selected) == 0 {
+		return
+	}
+	valid := make(map[string]bool)
+	for _, pkg := range st.packages {
+		valid[pkg] = true
+	}
+	for pkg := range st.selected {
+		if !valid[pkg] {
+			delete(st.selected, pkg)
+		}
+	}
 }
