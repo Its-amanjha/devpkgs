@@ -54,18 +54,27 @@ type LogFinishMsg struct {
 	Err     error
 }
 
-func RunStream(programChan chan<- tea.Msg, packageName string, action Action, manager string, cmdName string, args ...string) tea.Cmd {
+func RunStream(
+	programChan chan<- tea.Msg,
+	packageName string,
+	action Action,
+	manager string,
+	cmdName string,
+	args ...string,
+) tea.Cmd {
 	return func() tea.Msg {
 		go func() {
 			c := exec.Command(cmdName, args...)
 			stdout, err := c.StdoutPipe()
 			if err != nil {
 				programChan <- LogFinishMsg{Manager: manager, Err: err}
+				programChan <- ActionMsg{PackageName: packageName, Action: action, Manager: manager, Err: err}
 				return
 			}
 			c.Stderr = c.Stdout
 			if err := c.Start(); err != nil {
 				programChan <- LogFinishMsg{Manager: manager, Err: err}
+				programChan <- ActionMsg{PackageName: packageName, Action: action, Manager: manager, Err: err}
 				return
 			}
 
@@ -74,8 +83,17 @@ func RunStream(programChan chan<- tea.Msg, packageName string, action Action, ma
 				programChan <- LogLineMsg{Line: scanner.Text()}
 			}
 
+			var finishErr error
+			if scanErr := scanner.Err(); scanErr != nil {
+				finishErr = scanErr
+			}
+
 			err = c.Wait()
-			programChan <- LogFinishMsg{Manager: manager, Err: err}
+			if finishErr == nil {
+				finishErr = err
+			}
+
+			programChan <- LogFinishMsg{Manager: manager, Err: finishErr}
 			programChan <- ActionMsg{PackageName: packageName, Action: action, Manager: manager, Err: err}
 		}()
 		return nil
