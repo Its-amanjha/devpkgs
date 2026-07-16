@@ -7,6 +7,16 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	if maxLen < 3 {
+		return s[:maxLen]
+	}
+	return s[:maxLen-3] + "..."
+}
+
 func (m Model) renderLeftPanel(width int, boxHeight int) string {
 	if m.allMode {
 		return m.renderAllLeftPanel(width, boxHeight)
@@ -27,11 +37,12 @@ func (m Model) renderLeftPanel(width int, boxHeight int) string {
 	var listItems []string
 	for i := start; i < end; i++ {
 		pkg := st.displayPackages[i]
+		displayPkg := truncateString(pkg, innerWidth)
 		if i == st.cursor {
 			style := SelectedItemStyle.Width(innerWidth)
-			listItems = append(listItems, style.Render(pkg))
+			listItems = append(listItems, style.Render(displayPkg))
 		} else {
-			listItems = append(listItems, ItemStyle.Render(pkg))
+			listItems = append(listItems, ItemStyle.Render(displayPkg))
 		}
 	}
 
@@ -52,6 +63,7 @@ func (m Model) renderAllLeftPanel(width int, boxHeight int) string {
 	}
 
 	typeWidth := 5
+	innerWidth := width - 4
 
 	pmBadge := func(name string) lipgloss.Style {
 		switch name {
@@ -84,11 +96,15 @@ func (m Model) renderAllLeftPanel(width int, boxHeight int) string {
 		origin := m.allPackageOrigin[pkg]
 
 		originRendered := pmBadge(origin).Render(origin)
+		
+		maxPkgLen := innerWidth - 6
+		displayPkg := truncateString(pkg, maxPkgLen)
+		
 		var pkgRendered string
 		if i == m.allCursor {
-			pkgRendered = SelectedItemStyle.Render(pkg)
+			pkgRendered = SelectedItemStyle.Render(displayPkg)
 		} else {
-			pkgRendered = ItemStyle.Render(pkg)
+			pkgRendered = ItemStyle.Render(displayPkg)
 		}
 
 		listItems = append(listItems, originRendered+" "+pkgRendered)
@@ -141,13 +157,6 @@ func (m Model) renderBrewDetail(width int, height int, pkgName string, st TabSta
 			contentLines = append(contentLines, "")
 		}
 
-		type sectionData struct {
-			title string
-			lines []string
-		}
-		var sections []sectionData
-		var allWidths []int
-
 		var pkgPairs [][2]string
 		if ver, ok := st.Brew.InstalledVersions[pkgName]; ok {
 			pkgPairs = append(pkgPairs, [2]string{"Installed", ver})
@@ -170,11 +179,10 @@ func (m Model) renderBrewDetail(width int, height int, pkgName string, st TabSta
 			for _, p := range pkgPairs {
 				label := lipgloss.NewStyle().Width(maxLabel).Bold(true).Foreground(currentTheme.Primary).Render(p[0])
 				value := DetailValueStyle.Render(p[1])
-				line := label + "  " + value
-				allWidths = append(allWidths, lipgloss.Width(line))
-				lines = append(lines, line)
+				lines = append(lines, label+"  "+value)
 			}
-			sections = append(sections, sectionData{"Package", lines})
+			contentLines = append(contentLines, renderSection(width, "Package", lines...))
+			contentLines = append(contentLines, "")
 		}
 
 		var metaPairs [][2]string
@@ -206,37 +214,20 @@ func (m Model) renderBrewDetail(width int, height int, pkgName string, st TabSta
 				} else {
 					value = DetailValueStyle.Render(p[1])
 				}
-				line := label + "  " + value
-				allWidths = append(allWidths, lipgloss.Width(line))
-				lines = append(lines, line)
+				lines = append(lines, label+"  "+value)
 			}
-			sections = append(sections, sectionData{"Metadata", lines})
+			contentLines = append(contentLines, renderSection(width, "Metadata", lines...))
+			contentLines = append(contentLines, "")
 		}
 
 		if len(info.Dependencies) > 0 {
 			line := DetailValueStyle.Render(strings.Join(info.Dependencies, ", "))
-			allWidths = append(allWidths, lipgloss.Width(line))
-			sections = append(sections, sectionData{"Dependencies", []string{line}})
-		}
-
-		sectionWidth := width
-		if len(allWidths) > 0 {
-			maxW := 0
-			for _, w := range allWidths {
-				if w > maxW {
-					maxW = w
-				}
-			}
-			sectionWidth = min(width, max(maxW+4, 6))
-		}
-
-		for _, s := range sections {
-			contentLines = append(contentLines, renderSection(sectionWidth, s.title, s.lines...))
+			contentLines = append(contentLines, renderSection(width, "Dependencies", line))
+			contentLines = append(contentLines, "")
 		}
 	} else {
 		contentLines = append(contentLines, DetailValueStyle.Render("  No formula data available"))
 	}
-	contentLines = append(contentLines, "")
 	return renderPaneBox(width, height, "Details", strings.Join(contentLines, "\n"))
 }
 
@@ -253,13 +244,6 @@ func (m Model) renderNpmDetail(width int, height int, pkgName string, st TabStat
 			contentLines = append(contentLines, renderSection(width, "Description", info.Description))
 			contentLines = append(contentLines, "")
 		}
-
-		type sectionData struct {
-			title string
-			lines []string
-		}
-		var sections []sectionData
-		var allWidths []int
 
 		var pkgPairs [][2]string
 		if ver, ok := st.versions[pkgName]; ok {
@@ -280,11 +264,10 @@ func (m Model) renderNpmDetail(width int, height int, pkgName string, st TabStat
 			for _, p := range pkgPairs {
 				label := lipgloss.NewStyle().Width(maxLabel).Bold(true).Foreground(currentTheme.Primary).Render(p[0])
 				value := DetailValueStyle.Render(p[1])
-				line := label + "  " + value
-				allWidths = append(allWidths, lipgloss.Width(line))
-				lines = append(lines, line)
+				lines = append(lines, label+"  "+value)
 			}
-			sections = append(sections, sectionData{"Package", lines})
+			contentLines = append(contentLines, renderSection(width, "Package", lines...))
+			contentLines = append(contentLines, "")
 		}
 
 		var metaPairs [][2]string
@@ -314,31 +297,14 @@ func (m Model) renderNpmDetail(width int, height int, pkgName string, st TabStat
 				} else {
 					value = DetailValueStyle.Render(p[1])
 				}
-				line := label + "  " + value
-				allWidths = append(allWidths, lipgloss.Width(line))
-				lines = append(lines, line)
+				lines = append(lines, label+"  "+value)
 			}
-			sections = append(sections, sectionData{"Metadata", lines})
-		}
-
-		sectionWidth := width
-		if len(allWidths) > 0 {
-			maxW := 0
-			for _, w := range allWidths {
-				if w > maxW {
-					maxW = w
-				}
-			}
-			sectionWidth = min(width, max(maxW+4, 6))
-		}
-
-		for _, s := range sections {
-			contentLines = append(contentLines, renderSection(sectionWidth, s.title, s.lines...))
+			contentLines = append(contentLines, renderSection(width, "Metadata", lines...))
+			contentLines = append(contentLines, "")
 		}
 	} else {
 		contentLines = append(contentLines, DetailValueStyle.Render("  Loading..."))
 	}
-	contentLines = append(contentLines, "")
 	return renderPaneBox(width, height, "Details", strings.Join(contentLines, "\n"))
 }
 
@@ -355,13 +321,6 @@ func (m Model) renderPipDetail(width int, height int, pkgName string, st TabStat
 			contentLines = append(contentLines, renderSection(width, "Description", info.Summary))
 			contentLines = append(contentLines, "")
 		}
-
-		type sectionData struct {
-			title string
-			lines []string
-		}
-		var sections []sectionData
-		var allWidths []int
 
 		var pkgPairs [][2]string
 		if ver, ok := st.versions[pkgName]; ok {
@@ -382,11 +341,10 @@ func (m Model) renderPipDetail(width int, height int, pkgName string, st TabStat
 			for _, p := range pkgPairs {
 				label := lipgloss.NewStyle().Width(maxLabel).Bold(true).Foreground(currentTheme.Primary).Render(p[0])
 				value := DetailValueStyle.Render(p[1])
-				line := label + "  " + value
-				allWidths = append(allWidths, lipgloss.Width(line))
-				lines = append(lines, line)
+				lines = append(lines, label+"  "+value)
 			}
-			sections = append(sections, sectionData{"Package", lines})
+			contentLines = append(contentLines, renderSection(width, "Package", lines...))
+			contentLines = append(contentLines, "")
 		}
 
 		var metaPairs [][2]string
@@ -416,31 +374,14 @@ func (m Model) renderPipDetail(width int, height int, pkgName string, st TabStat
 				} else {
 					value = DetailValueStyle.Render(p[1])
 				}
-				line := label + "  " + value
-				allWidths = append(allWidths, lipgloss.Width(line))
-				lines = append(lines, line)
+				lines = append(lines, label+"  "+value)
 			}
-			sections = append(sections, sectionData{"Metadata", lines})
-		}
-
-		sectionWidth := width
-		if len(allWidths) > 0 {
-			maxW := 0
-			for _, w := range allWidths {
-				if w > maxW {
-					maxW = w
-				}
-			}
-			sectionWidth = min(width, max(maxW+4, 6))
-		}
-
-		for _, s := range sections {
-			contentLines = append(contentLines, renderSection(sectionWidth, s.title, s.lines...))
+			contentLines = append(contentLines, renderSection(width, "Metadata", lines...))
+			contentLines = append(contentLines, "")
 		}
 	} else {
 		contentLines = append(contentLines, DetailValueStyle.Render("  Loading..."))
 	}
-	contentLines = append(contentLines, "")
 	return renderPaneBox(width, height, "Details", strings.Join(contentLines, "\n"))
 }
 
@@ -457,13 +398,6 @@ func (m Model) renderWingetDetail(width int, height int, pkgName string, st TabS
 			contentLines = append(contentLines, renderSection(width, "Description", info.Description))
 			contentLines = append(contentLines, "")
 		}
-
-		type sectionData struct {
-			title string
-			lines []string
-		}
-		var sections []sectionData
-		var allWidths []int
 
 		var pkgPairs [][2]string
 		if ver, ok := st.versions[pkgName]; ok {
@@ -484,11 +418,10 @@ func (m Model) renderWingetDetail(width int, height int, pkgName string, st TabS
 			for _, p := range pkgPairs {
 				label := lipgloss.NewStyle().Width(maxLabel).Bold(true).Foreground(currentTheme.Primary).Render(p[0])
 				value := DetailValueStyle.Render(p[1])
-				line := label + "  " + value
-				allWidths = append(allWidths, lipgloss.Width(line))
-				lines = append(lines, line)
+				lines = append(lines, label+"  "+value)
 			}
-			sections = append(sections, sectionData{"Package", lines})
+			contentLines = append(contentLines, renderSection(width, "Package", lines...))
+			contentLines = append(contentLines, "")
 		}
 
 		var metaPairs [][2]string
@@ -518,31 +451,14 @@ func (m Model) renderWingetDetail(width int, height int, pkgName string, st TabS
 				} else {
 					value = DetailValueStyle.Render(p[1])
 				}
-				line := label + "  " + value
-				allWidths = append(allWidths, lipgloss.Width(line))
-				lines = append(lines, line)
+				lines = append(lines, label+"  "+value)
 			}
-			sections = append(sections, sectionData{"Metadata", lines})
-		}
-
-		sectionWidth := width
-		if len(allWidths) > 0 {
-			maxW := 0
-			for _, w := range allWidths {
-				if w > maxW {
-					maxW = w
-				}
-			}
-			sectionWidth = min(width, max(maxW+4, 6))
-		}
-
-		for _, s := range sections {
-			contentLines = append(contentLines, renderSection(sectionWidth, s.title, s.lines...))
+			contentLines = append(contentLines, renderSection(width, "Metadata", lines...))
+			contentLines = append(contentLines, "")
 		}
 	} else {
 		contentLines = append(contentLines, DetailValueStyle.Render("  Loading..."))
 	}
-	contentLines = append(contentLines, "")
 	return renderPaneBox(width, height, "Details", strings.Join(contentLines, "\n"))
 }
 
@@ -628,32 +544,25 @@ func (m Model) listViewFallback() string {
 }
 
 func renderSection(maxWidth int, title string, lines ...string) string {
-	violetStyle := lipgloss.NewStyle().Bold(true).Foreground(currentTheme.Primary)
-	border := lipgloss.NewStyle().Foreground(currentTheme.Primary)
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(currentTheme.Primary)
+	valueStyle := lipgloss.NewStyle().PaddingLeft(2).Foreground(currentTheme.Text)
 
-	maxContent := 0
+	var res []string
+	res = append(res, titleStyle.Render(title+":"))
 	for _, line := range lines {
-		w := lipgloss.Width(line)
-		if w > maxContent {
-			maxContent = w
+		wrapped := lipgloss.NewStyle().Width(maxWidth - 4).Render(line)
+		wrappedLines := strings.Split(wrapped, "\n")
+		for _, wl := range wrappedLines {
+			res = append(res, valueStyle.Render(wl))
 		}
 	}
-	boxWidth := max(maxContent+4, lipgloss.Width(title)+6)
-	boxWidth = min(boxWidth, maxWidth)
 
-	inner := boxWidth - 4
-	top := border.Render("╭━ ") +
-		violetStyle.Render(title) +
-		border.Render(" "+strings.Repeat("━", max(0, boxWidth-5-lipgloss.Width(title)))+"╮")
-
-	var body []string
-	for _, line := range lines {
-		padded := lipgloss.NewStyle().Width(inner).Render(line)
-		body = append(body, border.Render("│ ")+padded+border.Render(" │"))
+	if title == "Description" && len(res) > 4 {
+		res = res[:4]
+		res[3] = truncateString(res[3], maxWidth-8) + "..."
 	}
-	bottom := border.Render("╰" + strings.Repeat("─", boxWidth-2) + "╯")
 
-	return strings.Join(append([]string{top}, append(body, bottom)...), "\n")
+	return strings.Join(res, "\n")
 }
 
 func renderPaneBox(width int, height int, title string, content string) string {
