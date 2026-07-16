@@ -23,7 +23,13 @@ func (m Model) renderFooter() string {
 	if currentTheme != nil {
 		themeName = currentTheme.Name
 	}
-	help := FooterStyle.Render(fmt.Sprintf("[← → tabs] [/ search] [o outdated] [r refresh] [u upgrade] [x remove] [t theme %s] [q quit]", themeName))
+	var helpKeys string
+	if m.searchTabActive {
+		helpKeys = fmt.Sprintf("[← → tabs] [/ search] [i install] [t theme %s] [q quit]", themeName)
+	} else {
+		helpKeys = fmt.Sprintf("[← → tabs] [/ search] [o outdated] [r refresh] [u upgrade] [x remove] [t theme %s] [q quit]", themeName)
+	}
+	help := FooterStyle.Render(helpKeys)
 	status := ""
 	if m.actionStatus != "" {
 		status = "  " + FooterStyle.Render(m.actionStatus)
@@ -50,6 +56,9 @@ func (m Model) renderActionOverlay() string {
 			renderPaneBox(60, 6, "Confirm bulk action", content))
 	}
 	action := string(m.pendingAction)
+	if len(action) > 0 {
+		action = strings.ToUpper(action[:1]) + action[1:]
+	}
 	content := fmt.Sprintf("%s %q using %s?\n\nEnter: confirm   y: with logs   Esc/n: cancel", action, m.pendingPackage, m.tabs[m.pendingTab].Name())
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, renderPaneBox(60, 6, "Confirm package action", content))
 }
