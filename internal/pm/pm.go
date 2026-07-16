@@ -3,6 +3,7 @@ package pm
 import (
 	"bufio"
 	"os/exec"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -78,22 +79,21 @@ func RunStream(
 				return
 			}
 
-			scanner := bufio.NewScanner(stdout)
-			for scanner.Scan() {
-				programChan <- LogLineMsg{Line: scanner.Text()}
-			}
-
-			var finishErr error
-			if scanErr := scanner.Err(); scanErr != nil {
-				finishErr = scanErr
+			reader := bufio.NewReader(stdout)
+			for {
+				line, err := reader.ReadString('\n')
+				if len(line) > 0 {
+					trimmed := strings.TrimRight(line, "\r\n")
+					programChan <- LogLineMsg{Line: trimmed}
+				}
+				if err != nil {
+					break
+				}
 			}
 
 			err = c.Wait()
-			if finishErr == nil {
-				finishErr = err
-			}
 
-			programChan <- LogFinishMsg{Manager: manager, Err: finishErr}
+			programChan <- LogFinishMsg{Manager: manager, Err: err}
 			programChan <- ActionMsg{PackageName: packageName, Action: action, Manager: manager, Err: err}
 		}()
 		return nil

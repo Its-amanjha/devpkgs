@@ -87,7 +87,20 @@ func (m Model) renderThemeOverlay() string {
 
 func (m Model) renderLogOverlay() string {
 	boxW := min(78, m.width-6)
+	if boxW < 24 {
+		boxW = 24
+	}
+	if boxW > m.width {
+		boxW = m.width
+	}
+	
 	boxH := min(22, m.height-6)
+	if boxH < 8 {
+		boxH = 8
+	}
+	if boxH > m.height {
+		boxH = m.height
+	}
 	
 	border := lipgloss.NewStyle().Foreground(currentTheme.Primary)
 	titleText := lipgloss.NewStyle().Bold(true).Foreground(currentTheme.Primary).Render(" Installation Logs ")
@@ -129,7 +142,11 @@ func (m Model) renderLogOverlay() string {
 	}
 	content := strings.Join(items, "\n")
 	
-	bottom := border.Render("╰" + strings.Repeat("─", boxW-2) + "╯")
+	bottomRepeat := boxW - 2
+	if bottomRepeat < 0 {
+		bottomRepeat = 0
+	}
+	bottom := border.Render("╰" + strings.Repeat("─", bottomRepeat) + "╯")
 	
 	footerText := "  ↑↓ scroll · esc/l close"
 	if m.logActive {

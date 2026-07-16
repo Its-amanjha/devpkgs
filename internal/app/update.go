@@ -203,6 +203,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if m.logOverlay {
 			switch msg.String() {
+			case "ctrl+c":
+				return m, tea.Quit
 			case "esc", "l":
 				if !m.logActive {
 					m.logOverlay = false
@@ -210,7 +212,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "up":
 				m.logScrollActive = true
-				if m.logScrollOffset < len(m.logLines)-1 {
+				contentH := min(22, m.height-6) - 4
+				if contentH < 4 {
+					contentH = 4
+				}
+				maxScroll := len(m.logLines) - contentH
+				if maxScroll < 0 {
+					maxScroll = 0
+				}
+				if m.logScrollOffset < maxScroll {
 					m.logScrollOffset++
 				}
 				return m, nil
@@ -238,6 +248,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.logScrollOffset = 0
 				m.logScrollActive = false
 				m.logActive = true
+				m.logChan = make(chan tea.Msg, 100) // Fresh channel!
 				cmd := m.tabs[m.pendingTab].RunAction(m.pendingPackage, m.pendingAction, m.logChan)
 				return m, tea.Batch(cmd, ListenLogs(m.logChan))
 			default:
