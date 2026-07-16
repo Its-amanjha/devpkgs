@@ -41,7 +41,7 @@ func (w *WingetManager) RunAction(packageName string, action Action) tea.Cmd {
 	if action == Remove {
 		args = []string{"uninstall", "--id", packageName, "--exact", "--disable-interactivity"}
 	}
-	return Run(packageName, action, "winget", args...)
+	return Run(packageName, action, "winget", "winget", args...)
 }
 
 func parseWingetExport(data []byte) ([]string, map[string]string, error) {

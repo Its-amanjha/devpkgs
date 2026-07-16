@@ -165,7 +165,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.actionStatus = fmt.Sprintf("%s completed for %s", msg.Action, msg.PackageName)
-		return m.refresh()
+		return m.refreshTab(msg.Manager)
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd

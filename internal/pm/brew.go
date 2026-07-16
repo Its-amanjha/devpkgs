@@ -54,9 +54,9 @@ func (b *BrewManager) ListInstalled() tea.Cmd {
 
 func (b *BrewManager) RunAction(name string, action Action) tea.Cmd {
 	if action == Remove {
-		return Run(name, action, "brew", "uninstall", name)
+		return Run(name, action, "brew", "brew", "uninstall", name)
 	}
-	return Run(name, action, "brew", "upgrade", name)
+	return Run(name, action, "brew", "brew", "upgrade", name)
 }
 
 func (b *BrewManager) fetchList() tea.Cmd {

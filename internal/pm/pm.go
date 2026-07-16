@@ -30,15 +30,16 @@ type PackageListMsg struct {
 type ActionMsg struct {
 	PackageName string
 	Action      Action
+	Manager     string
 	Err         error
 }
 
-func Run(packageName string, action Action, name string, args ...string) tea.Cmd {
+func Run(packageName string, action Action, manager string, name string, args ...string) tea.Cmd {
 	return func() tea.Msg {
 		_, err := exec.Command(name, args...).CombinedOutput()
 		if err != nil {
-			return ActionMsg{PackageName: packageName, Action: action, Err: err}
+			return ActionMsg{PackageName: packageName, Action: action, Manager: manager, Err: err}
 		}
-		return ActionMsg{PackageName: packageName, Action: action}
+		return ActionMsg{PackageName: packageName, Action: action, Manager: manager}
 	}
 }

@@ -266,6 +266,26 @@ func (m Model) refresh() (Model, tea.Cmd) {
 	return m, tea.Batch(commands...)
 }
 
+func (m Model) refreshTab(managerName string) (Model, tea.Cmd) {
+	for i, tab := range m.tabs {
+		if tab.Name() == managerName {
+			m.states[i].loading = true
+			m.states[i].err = nil
+			if tab.Name() == "brew" && m.states[i].Brew != nil {
+				m.states[i].Brew.BrewListDone = false
+				m.states[i].Brew.BrewFormulaeDone = false
+				m.states[i].progressTarget = 0.35
+				m.states[i].progress = 0.0
+			} else {
+				m.states[i].progressTarget = 0.7
+				m.states[i].progress = 0.0
+			}
+			return m, tab.ListInstalled()
+		}
+	}
+	return m, nil
+}
+
 func (m Model) updateBrewInfo() Model {
 	if m.allMode {
 		return m
