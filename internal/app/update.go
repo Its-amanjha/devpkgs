@@ -593,6 +593,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "up":
+			if m.searchTabActive {
+				if m.searchResultCursor > 0 {
+					m.searchResultCursor--
+				}
+				return m, nil
+			}
 			if m.allMode {
 				if m.allCursor > 0 {
 					m.allCursor--
@@ -607,6 +613,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "down":
+			if m.searchTabActive {
+				if m.searchResultCursor < len(m.searchResults)-1 {
+					m.searchResultCursor++
+				}
+				return m, nil
+			}
 			if m.allMode {
 				if m.allCursor < len(m.allDisplayPackages)-1 {
 					m.allCursor++

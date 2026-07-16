@@ -38,8 +38,8 @@ func (m Model) View() string {
 
 	var leftPanel, rightPanel string
 	if m.searchTabActive {
-		leftPanel = renderPaneBox(leftWidth, boxHeight, "Search Results", "Type a package name and press Enter to search.")
-		rightPanel = renderPaneBox(rightWidth, boxHeight, "Details", "")
+		leftPanel = m.renderSearchLeftPanel(leftWidth, boxHeight)
+		rightPanel = m.renderSearchRightPanel(rightWidth, boxHeight)
 	} else {
 		leftPanel = m.renderLeftPanel(leftWidth, boxHeight)
 		rightPanel = m.renderRightPanel(rightWidth, boxHeight)

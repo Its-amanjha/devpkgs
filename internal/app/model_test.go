@@ -490,4 +490,75 @@ func TestBulkActionWithErrors(t *testing.T) {
 	}
 }
 
+func TestSearchUI(t *testing.T) {
+	m := New()
+	m.width = 80
+	m.height = 24
+	m.searchTabActive = true
+
+	// Initially empty search results
+	m.searchResults = nil
+	m.searchLoading = false
+	leftView := m.renderSearchLeftPanel(60, 20)
+	if !strings.Contains(leftView, "Type a package name and press Enter to search") {
+		t.Fatal("expected prompt when no search results are present")
+	}
+
+	// Simulated loading
+	m.searchLoading = true
+	leftView = m.renderSearchLeftPanel(60, 20)
+	if !strings.Contains(leftView, "Searching registries") {
+		t.Fatal("expected loading spinner prompt when search is loading")
+	}
+
+	// Simulated results
+	m.searchLoading = false
+	m.searchResults = []pm.SearchResult{
+		{Name: "wget", Manager: "brew", Description: "Internet retriever", Version: "1.21.4"},
+		{Name: "express", Manager: "npm", Description: "Fast framework", Version: "4.18.2"},
+	}
+	m.searchResultCursor = 0
+
+	leftView = m.renderSearchLeftPanel(60, 20)
+	if !strings.Contains(strings.ToLower(leftView), "wget") || !strings.Contains(strings.ToLower(leftView), "express") {
+		t.Fatal("expected search results to be rendered in left panel")
+	}
+
+	rightView := m.renderSearchRightPanel(50, 20)
+	if !strings.Contains(rightView, "wget") || !strings.Contains(rightView, "Internet retriever") {
+		t.Fatal("expected wget details to be rendered in right panel")
+	}
+
+	// Cursor navigation
+	// Down key
+	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updatedModel.(Model)
+	if cmd != nil {
+		t.Fatal("expected nil command on down navigation")
+	}
+	if m.searchResultCursor != 1 {
+		t.Fatalf("expected cursor to be 1, got %d", m.searchResultCursor)
+	}
+
+	rightView = m.renderSearchRightPanel(50, 20)
+	if !strings.Contains(rightView, "express") || !strings.Contains(rightView, "Fast framework") {
+		t.Fatal("expected express details to be rendered in right panel after navigation")
+	}
+
+	// Up key
+	updatedModel, cmd = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = updatedModel.(Model)
+	if m.searchResultCursor != 0 {
+		t.Fatalf("expected cursor to return to 0, got %d", m.searchResultCursor)
+	}
+
+	// List view fallback
+	m.width = 40 // small width to trigger list view fallback
+	fallbackView := m.listViewFallback()
+	if !strings.Contains(fallbackView, "[brew] wget") {
+		t.Fatal("expected fallback view to render search results correctly")
+	}
+}
+
+
 

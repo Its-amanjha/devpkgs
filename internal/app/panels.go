@@ -478,7 +478,34 @@ func (m Model) listViewFallback() string {
 	var list string
 	visibleHeight := m.height - 8
 
-	if m.allMode {
+	if m.searchTabActive {
+		title = TitleStyle.Render(fmt.Sprintf("Search Registry (%d)", len(m.searchResults)))
+		if len(m.searchResults) == 0 {
+			if m.searchLoading {
+				list = "  Searching registries...\n"
+			} else {
+				list = "  Type a package name and press Enter to search.\n"
+			}
+		} else {
+			start := 0
+			if m.searchResultCursor >= visibleHeight {
+				start = m.searchResultCursor - visibleHeight + 1
+			}
+			end := start + visibleHeight
+			if end > len(m.searchResults) {
+				end = len(m.searchResults)
+			}
+			for i := start; i < end; i++ {
+				res := m.searchResults[i]
+				pkgStr := fmt.Sprintf("[%s] %s", res.Manager, res.Name)
+				if i == m.searchResultCursor {
+					list += SelectedItemStyle.Render(pkgStr) + "\n"
+				} else {
+					list += ItemStyle.Render(pkgStr) + "\n"
+				}
+			}
+		}
+	} else if m.allMode {
 		title = TitleStyle.Render(fmt.Sprintf("devpkgs  (%d)", len(m.allPackages)))
 		start := 0
 		if m.allCursor >= visibleHeight {
@@ -622,6 +649,135 @@ func humanSize(bytes int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+func (m Model) renderSearchLeftPanel(width, height int) string {
+	innerWidth := width - 4
+	visibleHeight := height - 4
+
+	var lines []string
+	if m.searchLoading && len(m.searchResults) == 0 {
+		lines = append(lines, "  "+m.spinner.View()+" Searching registries...")
+	} else if len(m.searchResults) == 0 {
+		lines = append(lines, "  Type a package name and press Enter to search.")
+	} else {
+		start := 0
+		if m.searchResultCursor >= visibleHeight {
+			start = m.searchResultCursor - visibleHeight + 1
+		}
+		end := start + visibleHeight
+		if end > len(m.searchResults) {
+			end = len(m.searchResults)
+		}
+
+		pmBadgeFn := func(name string) lipgloss.Style {
+			switch name {
+			case "brew":
+				return lipgloss.NewStyle().
+					Width(6).
+					Background(currentTheme.Primary).
+					Foreground(currentTheme.SelectedFg)
+			case "npm":
+				return lipgloss.NewStyle().
+					Width(6).
+					Background(darkenHex(string(currentTheme.Primary), 0.65)).
+					Foreground(currentTheme.Text)
+			case "pip":
+				return lipgloss.NewStyle().
+					Width(6).
+					Background(darkenHex(string(currentTheme.Success), 0.65)).
+					Foreground(currentTheme.Text)
+			case "winget":
+				return lipgloss.NewStyle().
+					Width(6).
+					Background(darkenHex(string(currentTheme.Primary), 0.35)).
+					Foreground(currentTheme.Text)
+			default:
+				return lipgloss.NewStyle().
+					Width(6).
+					Background(currentTheme.Muted).
+					Foreground(currentTheme.Text)
+			}
+		}
+
+		for i := start; i < end; i++ {
+			res := m.searchResults[i]
+			badge := pmBadgeFn(res.Manager).Render(strings.ToUpper(res.Manager))
+			
+			namePart := res.Name
+			descPart := ""
+			if res.Description != "" {
+				descPart = " — " + res.Description
+			}
+			
+			fullText := namePart + descPart
+			maxTextLen := max(0, innerWidth-8)
+			truncated := truncateString(fullText, maxTextLen)
+
+			var line string
+			if i == m.searchResultCursor {
+				line = badge + " " + SelectedItemStyle.Render(truncated)
+			} else {
+				line = badge + " " + ItemStyle.Render(truncated)
+			}
+			lines = append(lines, line)
+		}
+
+		for len(lines) < visibleHeight {
+			lines = append(lines, "")
+		}
+	}
+
+	content := strings.Join(lines, "\n")
+	title := "Search Results"
+	if len(m.searchResults) > 0 {
+		title = fmt.Sprintf("Search Results (%d)", len(m.searchResults))
+	}
+	return renderPaneBox(width, height, title, content)
+}
+
+func (m Model) renderSearchRightPanel(width, height int) string {
+	if len(m.searchResults) == 0 {
+		return renderPaneBox(width, height, "Details", "")
+	}
+
+	res := m.searchResults[m.searchResultCursor]
+	var contentLines []string
+	contentLines = append(contentLines, "")
+
+	var pairs [][2]string
+	pairs = append(pairs, [2]string{"Name", res.Name})
+	pairs = append(pairs, [2]string{"Registry", strings.ToUpper(res.Manager)})
+	if res.Version != "" {
+		pairs = append(pairs, [2]string{"Version", res.Version})
+	}
+	if res.Description != "" {
+		pairs = append(pairs, [2]string{"Summary", res.Description})
+	}
+
+	maxLabel := 0
+	for _, p := range pairs {
+		w := lipgloss.Width(p[0])
+		if w > maxLabel {
+			maxLabel = w
+		}
+	}
+
+	var lines []string
+	for _, p := range pairs {
+		label := lipgloss.NewStyle().Width(maxLabel).Bold(true).Foreground(currentTheme.Primary).Render(p[0])
+		var value string
+		if p[0] == "Summary" {
+			value = DetailValueStyle.Render(p[1])
+		} else {
+			value = DetailValueStyle.Render(p[1])
+		}
+		lines = append(lines, label+"  "+value)
+	}
+
+	contentLines = append(contentLines, renderSection(width-4, "Registry Package Information", lines...))
+	content := strings.Join(contentLines, "\n")
+	return renderPaneBox(width, height, "Details", content)
 }
 
 func min(a, b int) int {
