@@ -535,12 +535,21 @@ func (m Model) listViewFallback() string {
 		if end > len(st.displayPackages) {
 			end = len(st.displayPackages)
 		}
+		showCheckboxes := len(st.selected) > 0
 		for i := start; i < end; i++ {
 			pkg := st.displayPackages[i]
+			displayPkg := pkg
+			if showCheckboxes {
+				prefix := "[ ] "
+				if st.selected[pkg] {
+					prefix = "[✓] "
+				}
+				displayPkg = prefix + pkg
+			}
 			if i == st.cursor {
-				list += SelectedItemStyle.Render(pkg) + "\n"
+				list += SelectedItemStyle.Render(displayPkg) + "\n"
 			} else {
-				list += ItemStyle.Render(pkg) + "\n"
+				list += ItemStyle.Render(displayPkg) + "\n"
 			}
 		}
 	}

@@ -412,10 +412,20 @@ func (m Model) startNextBulkAction() (Model, tea.Cmd) {
 
 	pkg := m.bulkQueue[m.bulkIndex]
 
+	actionStr := string(m.bulkAction)
+	if len(actionStr) > 0 {
+		actionStr = strings.ToUpper(actionStr[:1]) + actionStr[1:]
+	}
+
 	m.actionStatus = fmt.Sprintf("%s %d/%d: %s...", 
-		strings.Title(string(m.bulkAction)), m.bulkIndex+1, len(m.bulkQueue), pkg)
+		actionStr, m.bulkIndex+1, len(m.bulkQueue), pkg)
 		
-	m.logLines = nil
+	if m.bulkIndex == 0 {
+		m.logLines = nil
+	} else {
+		m.logLines = append(m.logLines, "", fmt.Sprintf("--- %s %s (%d/%d) ---", actionStr, pkg, m.bulkIndex+1, len(m.bulkQueue)))
+	}
+
 	m.logScrollOffset = 0
 	m.logScrollActive = false
 	m.logActive = true
