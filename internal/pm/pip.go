@@ -19,17 +19,24 @@ func NewPipManager(tabIndex int) *PipManager {
 	return &PipManager{tabIndex: tabIndex}
 }
 
-func (p *PipManager) Name() string {
-	return "pip"
+func (p *PipManager) Name() string     { return "pip" }
+func (p *PipManager) TabLabel() string { return "pip" }
+
+type PipDetailData struct {
+	Name        string `json:"name"`
+	Version     string `json:"version"`
+	Summary     string `json:"summary"`
+	License     string `json:"license"`
+	HomePage    string `json:"home_page"`
+	Author      string `json:"author"`
+	AuthorEmail string `json:"author_email"`
 }
 
-func (p *PipManager) TabLabel() string {
-	return "pip"
-}
+type PipAllDetailsMsg map[string]*PipDetailData
 
 func (p *PipManager) ListInstalled() tea.Cmd {
 	return func() tea.Msg {
-		cmd, args := p.resolveCmd()
+		cmd, args := p.resolve()
 		if cmd == "" {
 			return PackageListMsg{TabIndex: p.tabIndex}
 		}
@@ -38,39 +45,36 @@ func (p *PipManager) ListInstalled() tea.Cmd {
 		if err != nil {
 			return PackageListMsg{TabIndex: p.tabIndex}
 		}
-
-		var result []struct {
+		var rawList []struct {
 			Name    string `json:"name"`
 			Version string `json:"version"`
 		}
-		if err := json.Unmarshal(out, &result); err != nil {
+		if err := json.Unmarshal(out, &rawList); err != nil {
 			return PackageListMsg{Err: err, TabIndex: p.tabIndex}
 		}
-
-		names := make([]string, 0, len(result))
-		versions := make(map[string]string, len(result))
-		for _, pkg := range result {
+		names := make([]string, 0, len(rawList))
+		versions := make(map[string]string)
+		for _, pkg := range rawList {
 			names = append(names, pkg.Name)
 			versions[pkg.Name] = pkg.Version
 		}
-
 		return PackageListMsg{Packages: names, Versions: versions, TabIndex: p.tabIndex}
 	}
 }
 
-func (p *PipManager) RunAction(packageName string, action Action) tea.Cmd {
-	cmd, prefix := p.resolveCmd()
+func (p *PipManager) RunAction(name string, action Action) tea.Cmd {
+	cmd, prefix := p.resolve()
 	if cmd == "" {
-		return func() tea.Msg { return ActionMsg{PackageName: packageName, Action: action, Err: fmt.Errorf("pip is not installed")} }
+		return func() tea.Msg { return ActionMsg{PackageName: name, Action: action, Err: fmt.Errorf("pip not found")} }
 	}
-	args := append(prefix, "install", "--upgrade", packageName)
+	args := append(prefix, "install", "--upgrade", name)
 	if action == Remove {
-		args = append(prefix, "uninstall", "-y", packageName)
+		args = append(prefix, "uninstall", "-y", name)
 	}
-	return Run(packageName, action, cmd, args...)
+	return Run(name, action, cmd, args...)
 }
 
-func (p *PipManager) resolveCmd() (string, []string) {
+func (p *PipManager) resolve() (string, []string) {
 	if _, err := exec.LookPath("pip"); err == nil {
 		return "pip", nil
 	}
@@ -86,21 +90,9 @@ func (p *PipManager) resolveCmd() (string, []string) {
 	return "", nil
 }
 
-type PipDetailData struct {
-	Name        string `json:"name"`
-	Version     string `json:"version"`
-	Summary     string `json:"summary"`
-	License     string `json:"license"`
-	HomePage    string `json:"home_page"`
-	Author      string `json:"author"`
-	AuthorEmail string `json:"author_email"`
-}
-
-type PipAllDetailsMsg map[string]*PipDetailData
-
 func FetchAllPipDetails(names []string) tea.Cmd {
 	return func() tea.Msg {
-		results := make(map[string]*PipDetailData, len(names))
+		res := make(map[string]*PipDetailData)
 		var mu sync.Mutex
 		sem := make(chan struct{}, 5)
 		var wg sync.WaitGroup
@@ -108,30 +100,28 @@ func FetchAllPipDetails(names []string) tea.Cmd {
 		client := http.Client{Timeout: 10 * time.Second}
 		for _, name := range names {
 			wg.Add(1)
-			go func(n string) {
+			go func(pkg string) {
 				defer wg.Done()
 				sem <- struct{}{}
 				defer func() { <-sem }()
 
-				url := fmt.Sprintf("https://pypi.org/pypi/%s/json", n)
-				resp, err := client.Get(url)
+				resp, err := client.Get(fmt.Sprintf("https://pypi.org/pypi/%s/json", pkg))
 				if err != nil {
 					return
 				}
 				defer resp.Body.Close()
 
-				var pkgResp struct {
+				var wrapper struct {
 					Info PipDetailData `json:"info"`
 				}
-				if err := json.NewDecoder(resp.Body).Decode(&pkgResp); err != nil {
-					return
+				if err := json.NewDecoder(resp.Body).Decode(&wrapper); err == nil {
+					mu.Lock()
+					res[pkg] = &wrapper.Info
+					mu.Unlock()
 				}
-				mu.Lock()
-				results[n] = &pkgResp.Info
-				mu.Unlock()
 			}(name)
 		}
 		wg.Wait()
-		return PipAllDetailsMsg(results)
+		return PipAllDetailsMsg(res)
 	}
 }

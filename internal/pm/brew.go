@@ -19,30 +19,8 @@ func NewBrewManager(tabIndex int) *BrewManager {
 	return &BrewManager{tabIndex: tabIndex}
 }
 
-func (b *BrewManager) Name() string {
-	return "brew"
-}
-
-func (b *BrewManager) TabLabel() string {
-	return "Brew"
-}
-
-func (b *BrewManager) ListInstalled() tea.Cmd {
-	if _, err := exec.LookPath("brew"); err != nil {
-		return func() tea.Msg { return PackageListMsg{TabIndex: b.tabIndex} }
-	}
-	return tea.Batch(
-		b.fetchBrewList(),
-		b.fetchFormulae(),
-	)
-}
-
-func (b *BrewManager) RunAction(packageName string, action Action) tea.Cmd {
-	if action == Remove {
-		return Run(packageName, action, "brew", "uninstall", packageName)
-	}
-	return Run(packageName, action, "brew", "upgrade", packageName)
-}
+func (b *BrewManager) Name() string     { return "brew" }
+func (b *BrewManager) TabLabel() string { return "Brew" }
 
 type BrewListMsg struct {
 	Names             []string
@@ -52,9 +30,7 @@ type BrewListMsg struct {
 }
 
 type BrewErrMsg error
-
 type BrewFormulaeMsg map[string]FormulaData
-
 type BrewFormulaeErrMsg error
 
 type FormulaData struct {
@@ -69,82 +45,80 @@ type FormulaData struct {
 	BuildDependencies []string `json:"build_dependencies"`
 }
 
-func (b *BrewManager) fetchBrewList() tea.Cmd {
+func (b *BrewManager) ListInstalled() tea.Cmd {
+	if _, err := exec.LookPath("brew"); err != nil {
+		return func() tea.Msg { return PackageListMsg{TabIndex: b.tabIndex} }
+	}
+	return tea.Batch(b.fetchList(), b.fetchFormulae())
+}
+
+func (b *BrewManager) RunAction(name string, action Action) tea.Cmd {
+	if action == Remove {
+		return Run(name, action, "brew", "uninstall", name)
+	}
+	return Run(name, action, "brew", "upgrade", name)
+}
+
+func (b *BrewManager) fetchList() tea.Cmd {
 	return func() tea.Msg {
-		cmd := exec.Command("brew", "list", "--formula", "--versions")
-		out, err := cmd.Output()
+		out, err := exec.Command("brew", "list", "--formula", "--versions").Output()
 		if err != nil {
 			return BrewErrMsg(err)
 		}
 		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-
-		var names []string
+		names := make([]string, 0, len(lines))
+		versions := make(map[string]string)
 		paths := make(map[string]string)
-		installedVersions := make(map[string]string)
+		sizes := make(map[string]int64)
+
+		prefixOut, err := exec.Command("brew", "--prefix").Output()
+		prefix := strings.TrimSpace(string(prefixOut))
 
 		for _, line := range lines {
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				name, ver := parts[0], parts[1]
+			if line == "" {
+				continue
+			}
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				name, ver := fields[0], fields[1]
 				names = append(names, name)
-				installedVersions[name] = ver
-			}
-		}
-
-		if len(names) > 0 {
-			prefixOut, perr := exec.Command("brew", "--prefix").Output()
-			if perr == nil {
-				prefix := strings.TrimSpace(string(prefixOut))
-				for _, name := range names {
-					paths[name] = prefix + "/opt/" + name
-				}
-			}
-		}
-
-		sizes := make(map[string]int64, len(names))
-		for _, name := range names {
-			if path, ok := paths[name]; ok {
-				if out, err := exec.Command("du", "-skL", path).Output(); err == nil {
-					fields := strings.Fields(string(out))
-					if len(fields) > 0 {
-						if kb, err := strconv.ParseInt(fields[0], 10, 64); err == nil {
-							sizes[name] = kb * 1024
+				versions[name] = ver
+				if err == nil && prefix != "" {
+					path := prefix + "/opt/" + name
+					paths[name] = path
+					if duOut, duErr := exec.Command("du", "-skL", path).Output(); duErr == nil {
+						duFields := strings.Fields(string(duOut))
+						if len(duFields) > 0 {
+							if kb, parseErr := strconv.ParseInt(duFields[0], 10, 64); parseErr == nil {
+								sizes[name] = kb * 1024
+							}
 						}
 					}
 				}
 			}
 		}
-
-		return BrewListMsg{names, paths, installedVersions, sizes}
+		return BrewListMsg{Names: names, Paths: paths, InstalledVersions: versions, Sizes: sizes}
 	}
 }
 
 func (b *BrewManager) fetchFormulae() tea.Cmd {
 	return func() tea.Msg {
-		client := &http.Client{Timeout: 30 * time.Second}
+		client := &http.Client{Timeout: 15 * time.Second}
 		resp, err := client.Get("https://formulae.brew.sh/api/formula.json")
 		if err != nil {
 			return BrewFormulaeErrMsg(err)
 		}
 		defer resp.Body.Close()
 
-		dec := json.NewDecoder(resp.Body)
-
-		_, err = dec.Token()
-		if err != nil {
+		var rawList []FormulaData
+		if err := json.NewDecoder(resp.Body).Decode(&rawList); err != nil {
 			return BrewFormulaeErrMsg(err)
 		}
 
 		m := make(map[string]FormulaData)
-
-		for dec.More() {
-			var f FormulaData
-			if err := dec.Decode(&f); err != nil {
-				return BrewFormulaeErrMsg(err)
-			}
+		for _, f := range rawList {
 			m[f.Name] = f
 		}
-
 		return BrewFormulaeMsg(m)
 	}
 }
