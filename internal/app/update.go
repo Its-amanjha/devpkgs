@@ -241,6 +241,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "esc", "n":
 				m.actionOverlay = false
+				m.bulkQueue = nil
 				return m, nil
 			case "y":
 				m.actionOverlay = false
@@ -418,6 +419,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				action := pm.Upgrade
 				if msg.String() == "x" {
 					action = pm.Remove
+				}
+				if action == pm.Upgrade {
+					var filteredQueue []string
+					for _, pkg := range queue {
+						if !m.isUpToDate(m.activeTab, pkg) {
+							filteredQueue = append(filteredQueue, pkg)
+						}
+					}
+					queue = filteredQueue
+					if len(queue) == 0 {
+						m.actionStatus = "All selected packages are already up to date"
+						return m, nil
+					}
 				}
 				m.bulkQueue = queue
 				m.bulkIndex = 0

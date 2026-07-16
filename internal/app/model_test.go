@@ -202,4 +202,80 @@ func TestBulkQueueAndConfirmation(t *testing.T) {
 	}
 }
 
+func TestBulkUpgradeSkipUpToDate(t *testing.T) {
+	m := New()
+	m.allMode = false
+	m.activeTab = 0
+	for i := range m.states {
+		m.states[i].loading = false
+	}
+
+	m.states[0].packages = []string{"pkgA", "pkgB"}
+	m.states[0].displayPackages = []string{"pkgA", "pkgB"}
+	m.states[0].versions = map[string]string{"pkgA": "1.0.0", "pkgB": "1.0.0"}
+	m.states[0].Brew.FormulaeMap = map[string]pm.FormulaData{
+		"pkgA": {
+			Versions: struct {
+				Stable string `json:"stable"`
+			}{
+				Stable: "1.0.0", // Up-to-date
+			},
+		},
+		"pkgB": {
+			Versions: struct {
+				Stable string `json:"stable"`
+			}{
+				Stable: "1.1.0", // Outdated (needs upgrade)
+			},
+		},
+	}
+
+	// Case 1: Select both pkgA (up-to-date) and pkgB (outdated).
+	// Only pkgB should end up in the bulk upgrade queue.
+	m.states[0].selected = map[string]bool{
+		"pkgA": true,
+		"pkgB": true,
+	}
+
+	updatedModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'u'}})
+	m2 := updatedModel.(Model)
+
+	if !m2.actionOverlay {
+		t.Fatal("expected actionOverlay to be true when there is at least one package to upgrade")
+	}
+	if len(m2.bulkQueue) != 1 {
+		t.Fatalf("expected bulkQueue to have exactly 1 package, got %d (%v)", len(m2.bulkQueue), m2.bulkQueue)
+	}
+	if m2.bulkQueue[0] != "pkgB" {
+		t.Fatalf("expected bulkQueue to contain only 'pkgB', got %v", m2.bulkQueue)
+	}
+
+	// Test cancellation clears bulk queue (Finding 2)
+	cancelledModel, _ := m2.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	m3 := cancelledModel.(Model)
+	if m3.actionOverlay {
+		t.Fatal("expected actionOverlay to be false after cancel")
+	}
+	if m3.bulkQueue != nil {
+		t.Fatalf("expected bulkQueue to be nil after cancel, got %v", m3.bulkQueue)
+	}
+
+	// Case 2: Select only pkgA (up-to-date).
+	// The queue should be empty after filtering, overlay shouldn't open,
+	// and actionStatus should indicate they are already up to date.
+	m.states[0].selected = map[string]bool{
+		"pkgA": true,
+	}
+
+	updatedModel2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'u'}})
+	m4 := updatedModel2.(Model)
+
+	if m4.actionOverlay {
+		t.Fatal("expected actionOverlay to be false when all selected packages are up-to-date")
+	}
+	if m4.actionStatus != "All selected packages are already up to date" {
+		t.Fatalf("expected actionStatus 'All selected packages are already up to date', got '%s'", m4.actionStatus)
+	}
+}
+
 

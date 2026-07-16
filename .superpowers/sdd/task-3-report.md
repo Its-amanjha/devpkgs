@@ -33,3 +33,12 @@
 - Verification Command: `go build ./... && go test -v ./...`
 - Result: **PASS**
 - Unit tests pass successfully.
+
+## Fixes (Task 3 Review)
+
+- **Status**: DONE
+- **Fix Brief Requirements Implemented**:
+  1. **Skip Up-to-Date Packages in Bulk Upgrade**: Inside [internal/app/update.go](file:///D:/Github%20repo/devpkgs/internal/app/update.go), inside the `"u", "x"` case, if the action is upgrade (`"u"`), we filter `queue` to skip any packages that are already up to date according to `m.isUpToDate(m.activeTab, pkg)`. If all selected packages are up to date (leaving the queue empty), we set `m.actionStatus = "All selected packages are already up to date"` and return without showing the overlay.
+  2. **Reset Bulk Queue on Cancel**: Inside the `actionOverlay` key handler in [internal/app/update.go](file:///D:/Github%20repo/devpkgs/internal/app/update.go), when `esc` or `n` is pressed, we explicitly reset `m.bulkQueue = nil`.
+  3. **Unit Tests**: Added [TestBulkUpgradeSkipUpToDate](file:///D:/Github%20repo/devpkgs/internal/app/model_test.go) to `internal/app/model_test.go` verifying that up-to-date selected packages are skipped from the bulk upgrade queue, that if all selected packages are up-to-date the overlay is not opened and the correct status is set, and that canceling the overlay properly clears the bulk queue.
+- **Verification**: Ran `go test ./...`, all tests compile and pass.
