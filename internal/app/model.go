@@ -51,6 +51,12 @@ func tickCmd() tea.Cmd {
 	})
 }
 
+func ListenLogs(ch chan tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		return <-ch
+	}
+}
+
 type Model struct {
 	activeTab int
 	tabs      []pm.Manager
@@ -80,6 +86,13 @@ type Model struct {
 	outdatedOnly   bool
 
 	sparklineHistory []float64
+
+	logOverlay      bool
+	logLines        []string
+	logScrollOffset int
+	logScrollActive bool
+	logActive       bool
+	logChan         chan tea.Msg
 }
 
 func New() Model {
@@ -120,6 +133,7 @@ func New() Model {
 		spinner:          s,
 		sparklineHistory: make([]float64, 0, 40),
 		allPackageOrigin: make(map[string]string),
+		logChan:          make(chan tea.Msg, 100),
 	}
 }
 
