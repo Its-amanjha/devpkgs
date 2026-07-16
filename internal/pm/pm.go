@@ -1,6 +1,7 @@
 package pm
 
 import (
+	"bufio"
 	"os/exec"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -41,5 +42,42 @@ func Run(packageName string, action Action, manager string, name string, args ..
 			return ActionMsg{PackageName: packageName, Action: action, Manager: manager, Err: err}
 		}
 		return ActionMsg{PackageName: packageName, Action: action, Manager: manager}
+	}
+}
+
+type LogLineMsg struct {
+	Line string
+}
+
+type LogFinishMsg struct {
+	Manager string
+	Err     error
+}
+
+func RunStream(programChan chan<- tea.Msg, packageName string, action Action, manager string, cmdName string, args ...string) tea.Cmd {
+	return func() tea.Msg {
+		go func() {
+			c := exec.Command(cmdName, args...)
+			stdout, err := c.StdoutPipe()
+			if err != nil {
+				programChan <- LogFinishMsg{Manager: manager, Err: err}
+				return
+			}
+			c.Stderr = c.Stdout
+			if err := c.Start(); err != nil {
+				programChan <- LogFinishMsg{Manager: manager, Err: err}
+				return
+			}
+
+			scanner := bufio.NewScanner(stdout)
+			for scanner.Scan() {
+				programChan <- LogLineMsg{Line: scanner.Text()}
+			}
+
+			err = c.Wait()
+			programChan <- LogFinishMsg{Manager: manager, Err: err}
+			programChan <- ActionMsg{PackageName: packageName, Action: action, Manager: manager, Err: err}
+		}()
+		return nil
 	}
 }
