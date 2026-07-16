@@ -58,6 +58,9 @@ func (m Model) View() string {
 
 	rendered := docStyle.Render(body)
 
+	if m.logOverlay {
+		return m.renderLogOverlay()
+	}
 	if m.themeOverlay {
 		return m.renderThemeOverlay()
 	}

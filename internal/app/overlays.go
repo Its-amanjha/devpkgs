@@ -84,3 +84,59 @@ func (m Model) renderThemeOverlay() string {
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, overlay)
 }
+
+func (m Model) renderLogOverlay() string {
+	boxW := min(78, m.width-6)
+	boxH := min(22, m.height-6)
+	
+	border := lipgloss.NewStyle().Foreground(currentTheme.Primary)
+	titleText := lipgloss.NewStyle().Bold(true).Foreground(currentTheme.Primary).Render(" Installation Logs ")
+	dashLen := max(0, boxW-4-lipgloss.Width(titleText))
+	titleLine := border.Render("╭─"+strings.Repeat("─", dashLen/2)) + titleText +
+		border.Render(strings.Repeat("─", dashLen-dashLen/2)+"─╮")
+		
+	contentH := boxH - 4
+	
+	var linesToShow []string
+	totalLines := len(m.logLines)
+	
+	startLine := totalLines - contentH
+	if m.logScrollActive {
+		startLine = totalLines - contentH - m.logScrollOffset
+	}
+	if startLine < 0 {
+		startLine = 0
+	}
+	endLine := startLine + contentH
+	if endLine > totalLines {
+		endLine = totalLines
+	}
+	
+	for i := startLine; i < endLine; i++ {
+		linesToShow = append(linesToShow, m.logLines[i])
+	}
+	
+	// Pad to fill box height
+	for len(linesToShow) < contentH {
+		linesToShow = append(linesToShow, "")
+	}
+	
+	var items []string
+	innerW := boxW - 4
+	for _, l := range linesToShow {
+		padded := lipgloss.NewStyle().Width(innerW).MaxHeight(1).Render(l)
+		items = append(items, border.Render("│ ")+padded+border.Render(" │"))
+	}
+	content := strings.Join(items, "\n")
+	
+	bottom := border.Render("╰" + strings.Repeat("─", boxW-2) + "╯")
+	
+	footerText := "  ↑↓ scroll · esc/l close"
+	if m.logActive {
+		footerText = "  " + m.spinner.View() + " running... "
+	}
+	footer := lipgloss.NewStyle().Foreground(currentTheme.DimText).Italic(true).Render(footerText)
+	
+	overlay := strings.Join([]string{titleLine, content, bottom, footer}, "\n")
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, overlay)
+}
