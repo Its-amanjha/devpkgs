@@ -317,6 +317,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.searchActive {
 			switch msg.String() {
 			case "esc":
+				if m.searchTabActive {
+					m.searchQuery = ""
+					m = m.applyFilter()
+					return m, nil
+				}
 				m.searchActive = false
 				m.searchQuery = ""
 				m = m.applyFilter()
@@ -380,7 +385,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case " ":
-			if !m.allMode {
+			if !m.allMode && !m.searchTabActive {
 				st := &m.states[m.activeTab]
 				if st.cursor < len(st.displayPackages) {
 					pkg := st.displayPackages[st.cursor]
@@ -410,17 +415,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "/":
-			m.searchActive = true
-			m.searchQuery = ""
+			if !m.searchTabActive {
+				m.searchActive = true
+				m.searchQuery = ""
+			}
 
 		case "r":
-			return m.refresh()
+			if !m.searchTabActive {
+				return m.refresh()
+			}
 
 		case "o":
-			m.outdatedOnly = !m.outdatedOnly
-			m = m.applyFilter()
+			if !m.searchTabActive {
+				m.outdatedOnly = !m.outdatedOnly
+				m = m.applyFilter()
+			}
 
 		case "u", "x":
+			if m.searchTabActive {
+				return m, nil
+			}
 			if !m.allMode && len(m.states[m.activeTab].selected) > 0 {
 				st := &m.states[m.activeTab]
 				var queue []string
@@ -486,6 +500,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "left":
+			if m.searchTabActive {
+				m.searchTabActive = false
+				m.activeTab = len(m.tabs) - 1
+				m.searchActive = false
+				m.searchQuery = ""
+				m.searchResults = nil
+				m.searchResultCursor = 0
+				m.searchLoading = false
+				m.searchActiveWorkers = 0
+				return m, m.selectPackageCmd()
+			}
 			if m.allMode {
 				return m, nil
 			}
@@ -507,6 +532,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "right":
+			if m.searchTabActive {
+				return m, nil
+			}
 			if m.allMode {
 				m.allMode = false
 				m.activeTab = 0
@@ -524,6 +552,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.tabs[m.activeTab].ListInstalled()
 				}
 				return m, m.selectPackageCmd()
+			}
+			if m.activeTab == len(m.tabs)-1 {
+				m.searchTabActive = true
+				m.allMode = false
+				m.searchActive = true
+				m.searchQuery = ""
+				return m, nil
 			}
 
 		case "up":

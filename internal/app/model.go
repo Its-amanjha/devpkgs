@@ -59,6 +59,13 @@ func ListenLogs(ch chan tea.Msg) tea.Cmd {
 	}
 }
 
+type SearchResult struct {
+	Name        string
+	Manager     string
+	Description string
+	Version     string
+}
+
 type Model struct {
 	activeTab int
 	tabs      []pm.Manager
@@ -94,6 +101,12 @@ type Model struct {
 	bulkErrors []string
 
 	sparklineHistory []float64
+
+	searchResults       []SearchResult
+	searchResultCursor  int
+	searchLoading       bool
+	searchActiveWorkers int
+	searchTabActive     bool
 
 	logOverlay      bool
 	logLines        []string

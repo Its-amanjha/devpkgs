@@ -12,7 +12,7 @@ func (m Model) View() string {
 		return ""
 	}
 
-	if !m.allLoaded() {
+	if !m.allLoaded() && !m.searchTabActive {
 		return m.renderLoading()
 	}
 
@@ -36,8 +36,14 @@ func (m Model) View() string {
 
 	boxHeight := max(0, m.height-12-searchOffset)
 
-	leftPanel := m.renderLeftPanel(leftWidth, boxHeight)
-	rightPanel := m.renderRightPanel(rightWidth, boxHeight)
+	var leftPanel, rightPanel string
+	if m.searchTabActive {
+		leftPanel = renderPaneBox(leftWidth, boxHeight, "Search Results", "Type a package name and press Enter to search.")
+		rightPanel = renderPaneBox(rightWidth, boxHeight, "Details", "")
+	} else {
+		leftPanel = m.renderLeftPanel(leftWidth, boxHeight)
+		rightPanel = m.renderRightPanel(rightWidth, boxHeight)
+	}
 
 	leftStyled := lipgloss.NewStyle().Width(leftWidth).Height(boxHeight).Render(leftPanel)
 	rightStyled := lipgloss.NewStyle().Width(rightWidth).Height(boxHeight).Render(rightPanel)
@@ -170,6 +176,9 @@ func (m Model) renderSearchBar(width int, focused bool) string {
 	violetBold := lipgloss.NewStyle().Bold(true).Foreground(currentTheme.Primary)
 
 	badge := "Search"
+	if m.searchTabActive {
+		badge = "Search Registry"
+	}
 	top := border.Render("╭━ ") +
 		violetBold.Render(badge) +
 		border.Render(" "+strings.Repeat("━", max(0, width-5-lipgloss.Width(badge)))+"╮")

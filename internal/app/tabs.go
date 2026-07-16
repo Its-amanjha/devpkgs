@@ -33,12 +33,19 @@ func (m Model) renderTabBar(width int) string {
 
 	for i, tab := range m.tabs {
 		label := strings.ToUpper(tab.TabLabel())
-		if !m.allMode && i == m.activeTab {
+		if !m.allMode && !m.searchTabActive && i == m.activeTab {
 			cells = append(cells, activeStyle.Render(label))
 		} else {
 			cells = append(cells, inactiveStyle.Render(label))
 
 		}
+	}
+
+	searchLabel := "SEARCH"
+	if m.searchTabActive {
+		cells = append(cells, activeStyle.Render(searchLabel))
+	} else {
+		cells = append(cells, inactiveStyle.Render(searchLabel))
 	}
 
 	tabLine := strings.Join(cells, separator)
