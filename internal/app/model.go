@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -393,4 +394,34 @@ func (m Model) updateSparkline() {
 	if len(m.sparklineHistory) > 40 {
 		m.sparklineHistory = m.sparklineHistory[len(m.sparklineHistory)-40:]
 	}
+}
+
+func (m Model) startNextBulkAction() (Model, tea.Cmd) {
+	if m.bulkIndex >= len(m.bulkQueue) {
+		// All done — clear selections and clear bulk state
+		m.states[m.pendingTab].selected = make(map[string]bool)
+		m.bulkQueue = nil
+		m.actionStatus = fmt.Sprintf("Bulk %s completed for %d packages", m.bulkAction, m.bulkIndex)
+		return m, m.tabs[m.pendingTab].ListInstalled()
+	}
+
+	pkg := m.bulkQueue[m.bulkIndex]
+
+	m.actionStatus = fmt.Sprintf("%s %d/%d: %s...", 
+		strings.Title(string(m.bulkAction)), m.bulkIndex+1, len(m.bulkQueue), pkg)
+		
+	m.logLines = nil
+	m.logScrollOffset = 0
+	m.logScrollActive = false
+	m.logActive = true
+	m.logChan = make(chan tea.Msg, 100)
+
+	if m.bulkLogs {
+		m.logOverlay = true
+	} else {
+		m.logOverlay = false
+	}
+
+	cmd := m.tabs[m.pendingTab].RunAction(pkg, m.bulkAction, m.logChan)
+	return m, tea.Batch(cmd, ListenLogs(m.logChan))
 }

@@ -171,9 +171,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case pm.ActionMsg:
 		if msg.Err != nil {
 			m.actionStatus = fmt.Sprintf("%s failed for %s: %v", msg.Action, msg.PackageName, msg.Err)
-			return m, nil
+		} else {
+			m.actionStatus = fmt.Sprintf("%s completed for %s", msg.Action, msg.PackageName)
 		}
-		m.actionStatus = fmt.Sprintf("%s completed for %s", msg.Action, msg.PackageName)
+
+		// If in bulk mode, advance to next package
+		if len(m.bulkQueue) > 0 {
+			m.bulkIndex++
+			return m.startNextBulkAction()
+		}
+
 		return m.refreshTab(msg.Manager)
 
 	case spinner.TickMsg:
@@ -246,6 +253,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "y":
 				m.actionOverlay = false
 				m.logOverlay = true
+				if len(m.bulkQueue) > 0 {
+					m.bulkLogs = true
+					return m.startNextBulkAction()
+				}
 				m.logLines = nil
 				m.logScrollOffset = 0
 				m.logScrollActive = false
@@ -255,6 +266,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Batch(cmd, ListenLogs(m.logChan))
 			case "enter", "s":
 				m.actionOverlay = false
+				if len(m.bulkQueue) > 0 {
+					m.bulkLogs = false
+					return m.startNextBulkAction()
+				}
 				m.logLines = nil
 				m.logScrollOffset = 0
 				m.logScrollActive = false

@@ -278,4 +278,135 @@ func TestBulkUpgradeSkipUpToDate(t *testing.T) {
 	}
 }
 
+func TestSequentialBulkActionExecution(t *testing.T) {
+	m := New()
+	m.allMode = false
+	m.activeTab = 0
+	for i := range m.states {
+		m.states[i].loading = false
+	}
+
+	m.states[0].packages = []string{"pkgA", "pkgB"}
+	m.states[0].displayPackages = []string{"pkgA", "pkgB"}
+	m.states[0].cursor = 0
+
+	// Select pkgA and pkgB
+	m.states[0].selected["pkgA"] = true
+	m.states[0].selected["pkgB"] = true
+
+	// Simulate pressing "x" key to uninstall bulk
+	mModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	m = mModel.(Model)
+
+	if !m.actionOverlay {
+		t.Fatal("expected actionOverlay to be true")
+	}
+	if len(m.bulkQueue) != 2 {
+		t.Fatalf("expected 2 packages in bulkQueue, got %d", len(m.bulkQueue))
+	}
+
+	// Confirm with "y" (logs enabled)
+	mModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	m = mModel.(Model)
+
+	if m.actionOverlay {
+		t.Fatal("expected actionOverlay to be false after confirmation")
+	}
+	if !m.logOverlay {
+		t.Fatal("expected logOverlay to be true since we pressed 'y'")
+	}
+	if !m.bulkLogs {
+		t.Fatal("expected bulkLogs to be true")
+	}
+	if m.bulkIndex != 0 {
+		t.Fatalf("expected bulkIndex to be 0, got %d", m.bulkIndex)
+	}
+	if cmd == nil {
+		t.Fatal("expected a non-nil batch command to start run")
+	}
+
+	// Simulate completion of the first package (pkgA)
+	actionMsg := pm.ActionMsg{
+		Manager:     "brew",
+		PackageName: "pkgA",
+		Action:      pm.Remove,
+		Err:         nil,
+	}
+	mModel, cmd = m.Update(actionMsg)
+	m = mModel.(Model)
+
+	// Since there is a second package (pkgB), bulkIndex should advance to 1, and start next action
+	if m.bulkIndex != 1 {
+		t.Fatalf("expected bulkIndex to advance to 1, got %d", m.bulkIndex)
+	}
+	if len(m.bulkQueue) != 2 {
+		t.Fatal("expected bulkQueue to still have 2 items")
+	}
+	if cmd == nil {
+		t.Fatal("expected a non-nil batch command to run next bulk action")
+	}
+
+	// Simulate completion of the second package (pkgB)
+	actionMsg2 := pm.ActionMsg{
+		Manager:     "brew",
+		PackageName: "pkgB",
+		Action:      pm.Remove,
+		Err:         nil,
+	}
+	mModel, cmd = m.Update(actionMsg2)
+	m = mModel.(Model)
+
+	// Bulk queue is completed: bulkQueue should be nil, selections cleared
+	if m.bulkQueue != nil {
+		t.Fatalf("expected bulkQueue to be nil after completion, got %v", m.bulkQueue)
+	}
+	if len(m.states[0].selected) != 0 {
+		t.Fatalf("expected selections to be cleared, got %v", m.states[0].selected)
+	}
+	if !strings.Contains(m.actionStatus, "Bulk remove completed") {
+		t.Fatalf("expected action status to say bulk completed, got '%s'", m.actionStatus)
+	}
+	if cmd == nil {
+		t.Fatal("expected tab list refresh command upon bulk completion")
+	}
+}
+
+func TestSequentialBulkActionExecutionSilent(t *testing.T) {
+	m := New()
+	m.allMode = false
+	m.activeTab = 0
+	for i := range m.states {
+		m.states[i].loading = false
+	}
+
+	m.states[0].packages = []string{"pkgA", "pkgB"}
+	m.states[0].displayPackages = []string{"pkgA", "pkgB"}
+	m.states[0].cursor = 0
+
+	// Select pkgA and pkgB
+	m.states[0].selected["pkgA"] = true
+	m.states[0].selected["pkgB"] = true
+
+	// Simulate pressing "x" key to uninstall bulk
+	mModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	m = mModel.(Model)
+
+	// Confirm with "enter" / "s" (logs disabled)
+	mModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = mModel.(Model)
+
+	if m.actionOverlay {
+		t.Fatal("expected actionOverlay to be false after confirmation")
+	}
+	if m.logOverlay {
+		t.Fatal("expected logOverlay to be false since we pressed 'enter'")
+	}
+	if m.bulkLogs {
+		t.Fatal("expected bulkLogs to be false")
+	}
+	if cmd == nil {
+		t.Fatal("expected a non-nil batch command to start run")
+	}
+}
+
 
