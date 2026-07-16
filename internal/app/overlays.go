@@ -34,7 +34,7 @@ func (m Model) renderFooter() string {
 func (m Model) renderActionOverlay() string {
 	action := string(m.pendingAction)
 	content := fmt.Sprintf("%s %q using %s?\n\nEnter/y: confirm   Esc/n: cancel", action, m.pendingPackage, m.tabs[m.pendingTab].Name())
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, renderPaneBox(60, "Confirm package action", content))
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, renderPaneBox(60, 6, "Confirm package action", content))
 }
 
 func (m Model) renderThemeOverlay() string {

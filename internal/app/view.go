@@ -37,7 +37,7 @@ func (m Model) View() string {
 	boxHeight := max(0, m.height-12-searchOffset)
 
 	leftPanel := m.renderLeftPanel(leftWidth, boxHeight)
-	rightPanel := m.renderRightPanel(rightWidth)
+	rightPanel := m.renderRightPanel(rightWidth, boxHeight)
 
 	leftStyled := lipgloss.NewStyle().Width(leftWidth).Height(boxHeight).Render(leftPanel)
 	rightStyled := lipgloss.NewStyle().Width(rightWidth).Height(boxHeight).Render(rightPanel)

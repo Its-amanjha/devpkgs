@@ -36,7 +36,7 @@ func (m Model) renderLeftPanel(width int, boxHeight int) string {
 	}
 
 	boxTitle := fmt.Sprintf("Packages (%d)", len(st.displayPackages))
-	return renderPaneBox(width, boxTitle, strings.Join(listItems, "\n"))
+	return renderPaneBox(width, boxHeight, boxTitle, strings.Join(listItems, "\n"))
 }
 
 func (m Model) renderAllLeftPanel(width int, boxHeight int) string {
@@ -94,222 +94,38 @@ func (m Model) renderAllLeftPanel(width int, boxHeight int) string {
 		listItems = append(listItems, originRendered+" "+pkgRendered)
 	}
 
-	boxTitle := fmt.Sprintf("All Packages (%d)", len(m.allDisplayPackages))
-
-	badgeLabel := "PM"
-	violetStyle := lipgloss.NewStyle().Bold(true).Foreground(currentTheme.Primary)
-	border := lipgloss.NewStyle().Foreground(currentTheme.Primary)
-	content := strings.Join(listItems, "\n")
-
-	w1 := lipgloss.Width(badgeLabel)
-	w2 := lipgloss.Width(boxTitle)
-	n := max(0, width-9-w1-w2)
-	top := border.Render("╭━ ") +
-		violetStyle.Render(badgeLabel) +
-		border.Render(" ━━ ") +
-		violetStyle.Render(boxTitle) +
-		border.Render(" "+strings.Repeat("━", n)+"╮")
-
-	inner := width - 4
-	lines := strings.Split(content, "\n")
-	var body []string
-	for _, line := range lines {
-		padded := lipgloss.NewStyle().Width(inner).Render(line)
-		body = append(body, border.Render("│ ")+padded+border.Render(" │"))
-	}
-
-	bottom := border.Render("╰" + strings.Repeat("─", width-2) + "╯")
-
-	return strings.Join(append([]string{top}, append(body, bottom)...), "\n")
+	boxTitle := fmt.Sprintf("PM  ·  All Packages (%d)", len(m.allDisplayPackages))
+	return renderPaneBox(width, boxHeight, boxTitle, strings.Join(listItems, "\n"))
 }
 
-func (m Model) renderRightPanel(width int) string {
-	if m.allMode {
-		return m.renderAllDetail(width)
-	}
-	st := m.states[m.activeTab]
-
-	if len(st.displayPackages) == 0 {
-		return renderPaneBox(width, "Details",
+func (m Model) renderRightPanel(width int, height int) string {
+	tabIdx, pkgName, ok := m.selectedPackage()
+	if !ok {
+		return renderPaneBox(width, height, "Details",
 			lipgloss.NewStyle().PaddingLeft(2).Foreground(currentTheme.DetailText).Render("No packages match your query"))
 	}
 
+	st := m.states[tabIdx]
 	if st.Brew != nil {
-		return m.renderBrewDetail(width, st)
+		return m.renderBrewDetail(width, height, pkgName, st)
 	}
-	if m.tabs[m.activeTab].Name() == "npm" {
-		return m.renderNpmDetail(width, st)
+	if m.tabs[tabIdx].Name() == "npm" {
+		return m.renderNpmDetail(width, height, pkgName, st)
 	}
-	if m.tabs[m.activeTab].Name() == "pip" {
-		return m.renderPipDetail(width, st)
+	if m.tabs[tabIdx].Name() == "pip" {
+		return m.renderPipDetail(width, height, pkgName, st)
 	}
-	if m.tabs[m.activeTab].Name() == "winget" {
-		return m.renderWingetDetail(width, st)
+	if m.tabs[tabIdx].Name() == "winget" {
+		return m.renderWingetDetail(width, height, pkgName, st)
 	}
-	return renderPaneBox(width, "Details",
+	return renderPaneBox(width, height, "Details",
 		lipgloss.NewStyle().PaddingLeft(2).Foreground(currentTheme.DetailText).Render("Details coming soon for this package manager"))
 }
 
-func (m Model) renderAllDetail(width int) string {
-	if len(m.allDisplayPackages) == 0 {
-		return renderPaneBox(width, "Details",
-			lipgloss.NewStyle().PaddingLeft(2).Foreground(currentTheme.DetailText).Render("No packages match your query"))
-	}
-	pkgName := m.allDisplayPackages[m.allCursor]
-	origin := m.allPackageOrigin[pkgName]
-
-	originIdx := -1
-	for i, t := range m.tabs {
-		if t.Name() == origin {
-			originIdx = i
-			break
-		}
-	}
-	if originIdx == -1 {
-		return renderPaneBox(width, "Details",
-			lipgloss.NewStyle().PaddingLeft(2).Foreground(currentTheme.DetailText).Render("Unknown package origin"))
-	}
-
-	st := m.states[originIdx]
-
-	cursor := -1
-	for i, p := range st.displayPackages {
-		if p == pkgName {
-			cursor = i
-			break
-		}
-	}
-	if cursor == -1 {
-		return renderPaneBox(width, "Details",
-			lipgloss.NewStyle().PaddingLeft(2).Foreground(currentTheme.DetailText).Render("Package details loading..."))
-	}
-
-	if st.Brew != nil {
-		localSt := st
-		localSt.cursor = cursor
-		if f, ok := localSt.Brew.FormulaeMap[pkgName]; ok {
-			localSt.Brew.Info = &f
-		} else {
-			localSt.Brew.Info = nil
-		}
-		return m.renderBrewDetail(width, localSt)
-	}
-
-	localSt := st
-	localSt.cursor = cursor
-	if origin == "pip" {
-		return m.renderPipDetail(width, localSt)
-	}
-	if origin == "winget" {
-		return m.renderWingetDetail(width, localSt)
-	}
-	return m.renderNpmDetail(width, localSt)
-}
-
-func (m Model) renderWingetDetail(width int, st TabState) string {
-	pkgName := st.displayPackages[st.cursor]
-
-	var contentLines []string
-	contentLines = append(contentLines, "")
-	contentLines = append(contentLines, DetailTitleStyle.Render("📦 "+pkgName))
-	contentLines = append(contentLines, "")
-
-	if st.WingetDetails == nil {
-		contentLines = append(contentLines, DetailValueStyle.Render("  Loading registry data..."))
-	} else if info, ok := st.WingetDetails[pkgName]; ok {
-		if info.Description != "" {
-			contentLines = append(contentLines, renderSection(width, "Description", info.Description))
-			contentLines = append(contentLines, "")
-		}
-
-		type sectionData struct {
-			title string
-			lines []string
-		}
-		var sections []sectionData
-		var allWidths []int
-
-		var pkgPairs [][2]string
-		if ver, ok := st.versions[pkgName]; ok {
-			pkgPairs = append(pkgPairs, [2]string{"Installed", ver})
-		}
-		if info.Version != "" {
-			pkgPairs = append(pkgPairs, [2]string{"Latest", info.Version})
-		}
-		if len(pkgPairs) > 0 {
-			maxLabel := 0
-			for _, p := range pkgPairs {
-				w := lipgloss.Width(p[0])
-				if w > maxLabel { maxLabel = w }
-			}
-			var lines []string
-			for _, p := range pkgPairs {
-				label := lipgloss.NewStyle().Width(maxLabel).Bold(true).Foreground(currentTheme.Primary).Render(p[0])
-				value := DetailValueStyle.Render(p[1])
-				line := label + "  " + value
-				allWidths = append(allWidths, lipgloss.Width(line))
-				lines = append(lines, line)
-			}
-			sections = append(sections, sectionData{"Package", lines})
-		}
-
-		var metaPairs [][2]string
-		if info.License != "" {
-			metaPairs = append(metaPairs, [2]string{"License", info.License})
-		}
-		if info.Homepage != "" {
-			metaPairs = append(metaPairs, [2]string{"Homepage", info.Homepage})
-		}
-		if info.Publisher != "" {
-			metaPairs = append(metaPairs, [2]string{"Publisher", info.Publisher})
-		}
-		if len(metaPairs) > 0 {
-			maxLabel := 0
-			for _, p := range metaPairs {
-				w := lipgloss.Width(p[0])
-				if w > maxLabel { maxLabel = w }
-			}
-			var lines []string
-			for _, p := range metaPairs {
-				label := lipgloss.NewStyle().Width(maxLabel).Bold(true).Foreground(currentTheme.Primary).Render(p[0])
-				var value string
-				if p[0] == "Homepage" {
-					value = LinkStyle.Render(p[1])
-				} else {
-					value = DetailValueStyle.Render(p[1])
-				}
-				line := label + "  " + value
-				allWidths = append(allWidths, lipgloss.Width(line))
-				lines = append(lines, line)
-			}
-			sections = append(sections, sectionData{"Metadata", lines})
-		}
-
-		sectionWidth := width
-		if len(allWidths) > 0 {
-			maxW := 0
-			for _, w := range allWidths {
-				if w > maxW { maxW = w }
-			}
-			sectionWidth = min(width, max(maxW+4, 6))
-		}
-
-		for _, s := range sections {
-			contentLines = append(contentLines, renderSection(sectionWidth, s.title, s.lines...))
-		}
-	} else {
-		contentLines = append(contentLines, DetailValueStyle.Render("  Loading..."))
-	}
-	contentLines = append(contentLines, "")
-	return renderPaneBox(width, "Details", strings.Join(contentLines, "\n"))
-}
-
-
-func (m Model) renderBrewDetail(width int, st TabState) string {
+func (m Model) renderBrewDetail(width int, height int, pkgName string, st TabState) string {
 	if st.Brew == nil {
 		return ""
 	}
-	pkgName := st.displayPackages[st.cursor]
 
 	var contentLines []string
 	contentLines = append(contentLines, "")
@@ -421,11 +237,10 @@ func (m Model) renderBrewDetail(width int, st TabState) string {
 		contentLines = append(contentLines, DetailValueStyle.Render("  No formula data available"))
 	}
 	contentLines = append(contentLines, "")
-	return renderPaneBox(width, "Details", strings.Join(contentLines, "\n"))
+	return renderPaneBox(width, height, "Details", strings.Join(contentLines, "\n"))
 }
 
-func (m Model) renderNpmDetail(width int, st TabState) string {
-	pkgName := st.displayPackages[st.cursor]
+func (m Model) renderNpmDetail(width int, height int, pkgName string, st TabState) string {
 	var contentLines []string
 	contentLines = append(contentLines, "")
 	contentLines = append(contentLines, DetailTitleStyle.Render("📦 "+pkgName))
@@ -524,11 +339,10 @@ func (m Model) renderNpmDetail(width int, st TabState) string {
 		contentLines = append(contentLines, DetailValueStyle.Render("  Loading..."))
 	}
 	contentLines = append(contentLines, "")
-	return renderPaneBox(width, "Details", strings.Join(contentLines, "\n"))
+	return renderPaneBox(width, height, "Details", strings.Join(contentLines, "\n"))
 }
 
-func (m Model) renderPipDetail(width int, st TabState) string {
-	pkgName := st.displayPackages[st.cursor]
+func (m Model) renderPipDetail(width int, height int, pkgName string, st TabState) string {
 	var contentLines []string
 	contentLines = append(contentLines, "")
 	contentLines = append(contentLines, DetailTitleStyle.Render("📦 "+pkgName))
@@ -627,7 +441,109 @@ func (m Model) renderPipDetail(width int, st TabState) string {
 		contentLines = append(contentLines, DetailValueStyle.Render("  Loading..."))
 	}
 	contentLines = append(contentLines, "")
-	return renderPaneBox(width, "Details", strings.Join(contentLines, "\n"))
+	return renderPaneBox(width, height, "Details", strings.Join(contentLines, "\n"))
+}
+
+func (m Model) renderWingetDetail(width int, height int, pkgName string, st TabState) string {
+	var contentLines []string
+	contentLines = append(contentLines, "")
+	contentLines = append(contentLines, DetailTitleStyle.Render("📦 "+pkgName))
+	contentLines = append(contentLines, "")
+
+	if st.WingetDetails == nil {
+		contentLines = append(contentLines, DetailValueStyle.Render("  Loading registry data..."))
+	} else if info, ok := st.WingetDetails[pkgName]; ok {
+		if info.Description != "" {
+			contentLines = append(contentLines, renderSection(width, "Description", info.Description))
+			contentLines = append(contentLines, "")
+		}
+
+		type sectionData struct {
+			title string
+			lines []string
+		}
+		var sections []sectionData
+		var allWidths []int
+
+		var pkgPairs [][2]string
+		if ver, ok := st.versions[pkgName]; ok {
+			pkgPairs = append(pkgPairs, [2]string{"Installed", ver})
+		}
+		if info.Version != "" {
+			pkgPairs = append(pkgPairs, [2]string{"Latest", info.Version})
+		}
+		if len(pkgPairs) > 0 {
+			maxLabel := 0
+			for _, p := range pkgPairs {
+				w := lipgloss.Width(p[0])
+				if w > maxLabel {
+					maxLabel = w
+				}
+			}
+			var lines []string
+			for _, p := range pkgPairs {
+				label := lipgloss.NewStyle().Width(maxLabel).Bold(true).Foreground(currentTheme.Primary).Render(p[0])
+				value := DetailValueStyle.Render(p[1])
+				line := label + "  " + value
+				allWidths = append(allWidths, lipgloss.Width(line))
+				lines = append(lines, line)
+			}
+			sections = append(sections, sectionData{"Package", lines})
+		}
+
+		var metaPairs [][2]string
+		if info.License != "" {
+			metaPairs = append(metaPairs, [2]string{"License", info.License})
+		}
+		if info.Homepage != "" {
+			metaPairs = append(metaPairs, [2]string{"Homepage", info.Homepage})
+		}
+		if info.Publisher != "" {
+			metaPairs = append(metaPairs, [2]string{"Publisher", info.Publisher})
+		}
+		if len(metaPairs) > 0 {
+			maxLabel := 0
+			for _, p := range metaPairs {
+				w := lipgloss.Width(p[0])
+				if w > maxLabel {
+					maxLabel = w
+				}
+			}
+			var lines []string
+			for _, p := range metaPairs {
+				label := lipgloss.NewStyle().Width(maxLabel).Bold(true).Foreground(currentTheme.Primary).Render(p[0])
+				var value string
+				if p[0] == "Homepage" {
+					value = LinkStyle.Render(p[1])
+				} else {
+					value = DetailValueStyle.Render(p[1])
+				}
+				line := label + "  " + value
+				allWidths = append(allWidths, lipgloss.Width(line))
+				lines = append(lines, line)
+			}
+			sections = append(sections, sectionData{"Metadata", lines})
+		}
+
+		sectionWidth := width
+		if len(allWidths) > 0 {
+			maxW := 0
+			for _, w := range allWidths {
+				if w > maxW {
+					maxW = w
+				}
+			}
+			sectionWidth = min(width, max(maxW+4, 6))
+		}
+
+		for _, s := range sections {
+			contentLines = append(contentLines, renderSection(sectionWidth, s.title, s.lines...))
+		}
+	} else {
+		contentLines = append(contentLines, DetailValueStyle.Render("  Loading..."))
+	}
+	contentLines = append(contentLines, "")
+	return renderPaneBox(width, height, "Details", strings.Join(contentLines, "\n"))
 }
 
 func (m Model) listViewFallback() string {
@@ -740,7 +656,7 @@ func renderSection(maxWidth int, title string, lines ...string) string {
 	return strings.Join(append([]string{top}, append(body, bottom)...), "\n")
 }
 
-func renderPaneBox(width int, title string, content string) string {
+func renderPaneBox(width int, height int, title string, content string) string {
 	violetStyle := lipgloss.NewStyle().Bold(true).Foreground(currentTheme.Primary)
 	border := lipgloss.NewStyle().Foreground(currentTheme.Primary)
 
@@ -750,9 +666,15 @@ func renderPaneBox(width int, title string, content string) string {
 
 	inner := width - 4
 	lines := strings.Split(content, "\n")
+
+	targetContentHeight := max(0, height-2)
 	var body []string
-	for _, line := range lines {
-		padded := lipgloss.NewStyle().Width(inner).Render(line)
+	for i := 0; i < targetContentHeight; i++ {
+		var line string
+		if i < len(lines) {
+			line = lines[i]
+		}
+		padded := lipgloss.NewStyle().Width(inner).MaxHeight(1).Render(line)
 		body = append(body, border.Render("│ ")+padded+border.Render(" │"))
 	}
 	bottom := border.Render("╰" + strings.Repeat("─", width-2) + "╯")
