@@ -149,6 +149,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		st.PipDetailsReady = true
 		m = m.applyFilter()
 
+	case pm.WingetDetailMsg:
+		st := &m.states[3]
+		if msg.Err == nil && msg.Data != nil {
+			if st.WingetDetails == nil {
+				st.WingetDetails = make(map[string]*pm.WingetDetailData)
+			}
+			st.WingetDetails[msg.PackageID] = msg.Data
+		}
+		return m, nil
+
 	case pm.ActionMsg:
 		if msg.Err != nil {
 			m.actionStatus = fmt.Sprintf("%s failed for %s: %v", msg.Action, msg.PackageName, msg.Err)
@@ -244,6 +254,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.allMode {
 					if m.allCursor > 0 {
 						m.allCursor--
+						return m, m.selectPackageCmd()
 					}
 				} else {
 					st := &m.states[m.activeTab]
@@ -257,6 +268,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.allMode {
 					if m.allCursor < len(m.allDisplayPackages)-1 {
 						m.allCursor++
+						return m, m.selectPackageCmd()
 					}
 				} else {
 					st := &m.states[m.activeTab]
@@ -332,7 +344,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.allMode = true
 				m.searchActive = false
 				m.searchQuery = ""
-				return m.applyFilter(), nil
+				return m.applyFilter(), m.selectPackageCmd()
 			}
 
 		case "right":
@@ -359,6 +371,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.allMode {
 				if m.allCursor > 0 {
 					m.allCursor--
+					return m, m.selectPackageCmd()
 				}
 			} else {
 				st := &m.states[m.activeTab]
@@ -372,6 +385,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.allMode {
 				if m.allCursor < len(m.allDisplayPackages)-1 {
 					m.allCursor++
+					return m, m.selectPackageCmd()
 				}
 			} else {
 				st := &m.states[m.activeTab]

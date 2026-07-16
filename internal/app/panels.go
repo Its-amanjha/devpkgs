@@ -143,6 +143,9 @@ func (m Model) renderRightPanel(width int) string {
 	if m.tabs[m.activeTab].Name() == "pip" {
 		return m.renderPipDetail(width, st)
 	}
+	if m.tabs[m.activeTab].Name() == "winget" {
+		return m.renderWingetDetail(width, st)
+	}
 	return renderPaneBox(width, "Details",
 		lipgloss.NewStyle().PaddingLeft(2).Foreground(currentTheme.DetailText).Render("Details coming soon for this package manager"))
 }
@@ -197,8 +200,110 @@ func (m Model) renderAllDetail(width int) string {
 	if origin == "pip" {
 		return m.renderPipDetail(width, localSt)
 	}
+	if origin == "winget" {
+		return m.renderWingetDetail(width, localSt)
+	}
 	return m.renderNpmDetail(width, localSt)
 }
+
+func (m Model) renderWingetDetail(width int, st TabState) string {
+	pkgName := st.displayPackages[st.cursor]
+
+	var contentLines []string
+	contentLines = append(contentLines, "")
+	contentLines = append(contentLines, DetailTitleStyle.Render("📦 "+pkgName))
+	contentLines = append(contentLines, "")
+
+	if st.WingetDetails == nil {
+		contentLines = append(contentLines, DetailValueStyle.Render("  Loading registry data..."))
+	} else if info, ok := st.WingetDetails[pkgName]; ok {
+		if info.Description != "" {
+			contentLines = append(contentLines, renderSection(width, "Description", info.Description))
+			contentLines = append(contentLines, "")
+		}
+
+		type sectionData struct {
+			title string
+			lines []string
+		}
+		var sections []sectionData
+		var allWidths []int
+
+		var pkgPairs [][2]string
+		if ver, ok := st.versions[pkgName]; ok {
+			pkgPairs = append(pkgPairs, [2]string{"Installed", ver})
+		}
+		if info.Version != "" {
+			pkgPairs = append(pkgPairs, [2]string{"Latest", info.Version})
+		}
+		if len(pkgPairs) > 0 {
+			maxLabel := 0
+			for _, p := range pkgPairs {
+				w := lipgloss.Width(p[0])
+				if w > maxLabel { maxLabel = w }
+			}
+			var lines []string
+			for _, p := range pkgPairs {
+				label := lipgloss.NewStyle().Width(maxLabel).Bold(true).Foreground(currentTheme.Primary).Render(p[0])
+				value := DetailValueStyle.Render(p[1])
+				line := label + "  " + value
+				allWidths = append(allWidths, lipgloss.Width(line))
+				lines = append(lines, line)
+			}
+			sections = append(sections, sectionData{"Package", lines})
+		}
+
+		var metaPairs [][2]string
+		if info.License != "" {
+			metaPairs = append(metaPairs, [2]string{"License", info.License})
+		}
+		if info.Homepage != "" {
+			metaPairs = append(metaPairs, [2]string{"Homepage", info.Homepage})
+		}
+		if info.Publisher != "" {
+			metaPairs = append(metaPairs, [2]string{"Publisher", info.Publisher})
+		}
+		if len(metaPairs) > 0 {
+			maxLabel := 0
+			for _, p := range metaPairs {
+				w := lipgloss.Width(p[0])
+				if w > maxLabel { maxLabel = w }
+			}
+			var lines []string
+			for _, p := range metaPairs {
+				label := lipgloss.NewStyle().Width(maxLabel).Bold(true).Foreground(currentTheme.Primary).Render(p[0])
+				var value string
+				if p[0] == "Homepage" {
+					value = LinkStyle.Render(p[1])
+				} else {
+					value = DetailValueStyle.Render(p[1])
+				}
+				line := label + "  " + value
+				allWidths = append(allWidths, lipgloss.Width(line))
+				lines = append(lines, line)
+			}
+			sections = append(sections, sectionData{"Metadata", lines})
+		}
+
+		sectionWidth := width
+		if len(allWidths) > 0 {
+			maxW := 0
+			for _, w := range allWidths {
+				if w > maxW { maxW = w }
+			}
+			sectionWidth = min(width, max(maxW+4, 6))
+		}
+
+		for _, s := range sections {
+			contentLines = append(contentLines, renderSection(sectionWidth, s.title, s.lines...))
+		}
+	} else {
+		contentLines = append(contentLines, DetailValueStyle.Render("  Loading..."))
+	}
+	contentLines = append(contentLines, "")
+	return renderPaneBox(width, "Details", strings.Join(contentLines, "\n"))
+}
+
 
 func (m Model) renderBrewDetail(width int, st TabState) string {
 	if st.Brew == nil {

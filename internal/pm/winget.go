@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -64,3 +65,67 @@ func parseWingetExport(data []byte) ([]string, map[string]string, error) {
 	}
 	return names, versions, nil
 }
+
+type WingetDetailData struct {
+	ID          string
+	Version     string
+	Publisher   string
+	Homepage    string
+	License     string
+	Description string
+}
+
+type WingetDetailMsg struct {
+	PackageID string
+	Data      *WingetDetailData
+	Err       error
+}
+
+func ParseWingetShow(id string, output string) *WingetDetailData {
+	data := &WingetDetailData{ID: id}
+	lines := strings.Split(output, "\n")
+	inDesc := false
+	var descLines []string
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+
+		if strings.HasPrefix(line, "Version:") {
+			inDesc = false
+			data.Version = strings.TrimSpace(strings.TrimPrefix(line, "Version:"))
+		} else if strings.HasPrefix(line, "Publisher:") {
+			inDesc = false
+			data.Publisher = strings.TrimSpace(strings.TrimPrefix(line, "Publisher:"))
+		} else if strings.HasPrefix(line, "Homepage:") {
+			inDesc = false
+			data.Homepage = strings.TrimSpace(strings.TrimPrefix(line, "Homepage:"))
+		} else if strings.HasPrefix(line, "License:") {
+			inDesc = false
+			data.License = strings.TrimSpace(strings.TrimPrefix(line, "License:"))
+		} else if strings.HasPrefix(line, "Description:") {
+			inDesc = true
+		} else if inDesc {
+			if strings.HasPrefix(line, "  ") || strings.HasPrefix(line, "\t") {
+				descLines = append(descLines, trimmed)
+			} else {
+				inDesc = false
+			}
+		}
+	}
+	data.Description = strings.Join(descLines, " ")
+	return data
+}
+
+func FetchWingetDetails(id string) tea.Cmd {
+	return func() tea.Msg {
+		out, err := exec.Command("winget", "show", "--id", id, "--accept-source-agreements", "--disable-interactivity").Output()
+		if err != nil {
+			return WingetDetailMsg{PackageID: id, Err: err}
+		}
+		return WingetDetailMsg{PackageID: id, Data: ParseWingetShow(id, string(out))}
+	}
+}
+

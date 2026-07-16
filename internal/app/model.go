@@ -39,6 +39,7 @@ type TabState struct {
 	NpmDetailsReady bool
 	PipDetails      map[string]*pm.PipDetailData
 	PipDetailsReady bool
+	WingetDetails   map[string]*pm.WingetDetailData
 	DetailErr       error
 }
 
@@ -106,6 +107,9 @@ func New() Model {
 		}
 		if m.Name() == "brew" {
 			states[i].Brew = &BrewState{}
+		}
+		if m.Name() == "winget" {
+			states[i].WingetDetails = make(map[string]*pm.WingetDetailData)
 		}
 	}
 	return Model{
@@ -201,6 +205,10 @@ func (m Model) isOutdated(tabIndex int, packageName string) bool {
 		if info := m.states[tabIndex].PipDetails[packageName]; info != nil {
 			latest = info.Version
 		}
+	case "winget":
+		if info := m.states[tabIndex].WingetDetails[packageName]; info != nil {
+			latest = info.Version
+		}
 	}
 	return installed != "" && latest != "" && installed != latest
 }
@@ -251,15 +259,26 @@ func (m Model) updateBrewInfo() Model {
 }
 
 func (m Model) selectPackageCmd() tea.Cmd {
-	if m.allMode {
+	tabIndex, pkgName, ok := m.selectedPackage()
+	if !ok {
 		return nil
 	}
-	st := &m.states[m.activeTab]
-	if st.Brew != nil {
+	if m.tabs[tabIndex].Name() == "brew" {
 		m = m.updateBrewInfo()
+		return nil
+	}
+	if m.tabs[tabIndex].Name() == "winget" {
+		st := &m.states[tabIndex]
+		if st.WingetDetails == nil {
+			st.WingetDetails = make(map[string]*pm.WingetDetailData)
+		}
+		if _, cached := st.WingetDetails[pkgName]; !cached {
+			return pm.FetchWingetDetails(pkgName)
+		}
 	}
 	return nil
 }
+
 
 func (m Model) totalPackages() int {
 	total := 0
