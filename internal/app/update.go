@@ -317,12 +317,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "u", "x":
 			if tabIndex, packageName, ok := m.selectedPackage(); ok {
-				m.pendingTab = tabIndex
-				m.pendingPackage = packageName
-				m.pendingAction = pm.Upgrade
-				if msg.String() == "x" {
+				if msg.String() == "u" {
+					if m.isUpToDate(tabIndex, packageName) {
+						m.actionStatus = fmt.Sprintf("%s is already up to date", packageName)
+						return m, nil
+					}
+					m.pendingAction = pm.Upgrade
+				} else {
 					m.pendingAction = pm.Remove
 				}
+				m.pendingTab = tabIndex
+				m.pendingPackage = packageName
 				m.actionOverlay = true
 			}
 
