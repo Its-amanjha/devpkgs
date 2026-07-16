@@ -162,6 +162,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case pm.RegistrySearchMsg:
+		if msg.Err == nil {
+			m.searchResults = append(m.searchResults, msg.Results...)
+			sort.Slice(m.searchResults, func(i, j int) bool {
+				return m.searchResults[i].Name < m.searchResults[j].Name
+			})
+		}
+		m.searchActiveWorkers--
+		if m.searchActiveWorkers <= 0 {
+			m.searchLoading = false
+			m.searchActiveWorkers = 0
+		}
+
 	case pm.LogLineMsg:
 		m.logLines = append(m.logLines, msg.Line)
 		return m, ListenLogs(m.logChan)
@@ -327,6 +340,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m = m.applyFilter()
 				return m, nil
 			case "enter":
+				if m.searchTabActive && m.searchQuery != "" {
+					m.searchLoading = true
+					m.searchResults = nil
+					m.searchResultCursor = 0
+					m.searchActiveWorkers = 4 // 4 workers: brew, winget, npm, pip
+					cmds := []tea.Cmd{
+						pm.SearchNpm(m.searchQuery),
+						pm.SearchWinget(m.searchQuery),
+						pm.SearchPip(m.searchQuery),
+					}
+					// Brew search: pass formulae map if available
+					var formulaeMap map[string]pm.FormulaData
+					if m.states[0].Brew != nil && m.states[0].Brew.FormulaeReady {
+						formulaeMap = m.states[0].Brew.FormulaeMap
+					}
+					cmds = append(cmds, pm.SearchBrew(m.searchQuery, formulaeMap))
+					return m, tea.Batch(cmds...)
+				}
 				m.searchActive = false
 				return m, nil
 			case "left", "right":

@@ -59,12 +59,7 @@ func ListenLogs(ch chan tea.Msg) tea.Cmd {
 	}
 }
 
-type SearchResult struct {
-	Name        string
-	Manager     string
-	Description string
-	Version     string
-}
+
 
 type Model struct {
 	activeTab int
@@ -102,7 +97,7 @@ type Model struct {
 
 	sparklineHistory []float64
 
-	searchResults       []SearchResult
+	searchResults       []pm.SearchResult
 	searchResultCursor  int
 	searchLoading       bool
 	searchActiveWorkers int
