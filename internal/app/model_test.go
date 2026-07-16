@@ -120,4 +120,86 @@ func TestCheckboxAndFooterRendering(t *testing.T) {
 	}
 }
 
+func TestBulkQueueAndConfirmation(t *testing.T) {
+	m := New()
+	m.allMode = false
+	m.activeTab = 0
+	m.width = 80
+	m.height = 24
+	for i := range m.states {
+		m.states[i].loading = false
+	}
+
+	m.states[0].packages = []string{"pkgA", "pkgB", "pkgC"}
+	m.states[0].displayPackages = []string{"pkgA", "pkgB", "pkgC"}
+	m.states[0].cursor = 0
+
+	// Select pkgC and pkgA
+	m.states[0].selected["pkgC"] = true
+	m.states[0].selected["pkgA"] = true
+
+	// Simulate pressing "u" key
+	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'u'}})
+	if cmd != nil {
+		t.Fatal("expected no command on bulk action trigger")
+	}
+	m2 := updatedModel.(Model)
+
+	if !m2.actionOverlay {
+		t.Fatal("expected actionOverlay to be true")
+	}
+	if m2.bulkAction != pm.Upgrade {
+		t.Fatalf("expected bulkAction to be Upgrade, got %v", m2.bulkAction)
+	}
+	if m2.pendingTab != 0 {
+		t.Fatalf("expected pendingTab to be 0, got %d", m2.pendingTab)
+	}
+	if len(m2.bulkQueue) != 2 {
+		t.Fatalf("expected bulkQueue to have 2 packages, got %d", len(m2.bulkQueue))
+	}
+	// order should match displayPackages: pkgA then pkgC
+	if m2.bulkQueue[0] != "pkgA" || m2.bulkQueue[1] != "pkgC" {
+		t.Fatalf("expected bulkQueue to be [pkgA, pkgC], got %v", m2.bulkQueue)
+	}
+
+	// Test the confirmation rendering
+	viewStr := m2.View()
+	if !strings.Contains(viewStr, "Confirm bulk action") {
+		t.Fatal("expected action overlay to show 'Confirm bulk action' title")
+	}
+	if !strings.Contains(viewStr, "Upgrade 2 packages using brew?") {
+		t.Fatal("expected action overlay to show bulk execution text")
+	}
+
+	// Now test "x" trigger
+	updatedModel, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	m3 := updatedModel.(Model)
+	if m3.bulkAction != pm.Remove {
+		t.Fatalf("expected bulkAction to be Remove, got %v", m3.bulkAction)
+	}
+
+	// Now test single package fallback (empty selection)
+	m.states[0].selected = make(map[string]bool)
+	m.states[0].versions = map[string]string{"pkgA": "1.0.0"}
+	m.states[0].Brew.FormulaeMap = map[string]pm.FormulaData{
+		"pkgA": {
+			Versions: struct {
+				Stable string `json:"stable"`
+			}{
+				Stable: "1.1.0",
+			},
+		},
+	}
+	m.states[0].cursor = 0 // points to pkgA
+
+	updatedModel, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'u'}})
+	m4 := updatedModel.(Model)
+	if len(m4.bulkQueue) != 0 {
+		t.Fatalf("expected bulkQueue to be empty, got %v", m4.bulkQueue)
+	}
+	if m4.pendingPackage != "pkgA" {
+		t.Fatalf("expected pendingPackage to be pkgA, got %s", m4.pendingPackage)
+	}
+}
+
 

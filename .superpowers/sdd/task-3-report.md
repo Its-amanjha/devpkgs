@@ -1,50 +1,35 @@
-# Task 3 Report: Event Loop, Interface, and Updates
+# Task 3 Report: Bulk Queue State & Confirmation Dialog
 
 ## Status: DONE
 
-All requirements for Task 3 have been successfully implemented, verified, and tested.
-
 ## Files Modified
 
-- [internal/pm/pm.go](file:///d:/Github%20repo/devpkgs/internal/pm/pm.go)
-- [internal/pm/brew.go](file:///d:/Github%20repo/devpkgs/internal/pm/brew.go)
-- [internal/pm/npm.go](file:///d:/Github%20repo/devpkgs/internal/pm/npm.go)
-- [internal/pm/pip.go](file:///d:/Github%20repo/devpkgs/internal/pm/pip.go)
-- [internal/pm/winget.go](file:///d:/Github%20repo/devpkgs/internal/pm/winget.go)
+- [internal/app/model.go](file:///d:/Github%20repo/devpkgs/internal/app/model.go)
 - [internal/app/update.go](file:///d:/Github%20repo/devpkgs/internal/app/update.go)
+- [internal/app/overlays.go](file:///d:/Github%20repo/devpkgs/internal/app/overlays.go)
+- [internal/app/model_test.go](file:///d:/Github%20repo/devpkgs/internal/app/model_test.go)
 
 ## Implementation Summary
 
-1. **Manager Interface Update**
-   - Modified `Manager.RunAction` in [pm.go](file:///d:/Github%20repo/devpkgs/internal/pm/pm.go) to accept the `programChan chan<- tea.Msg` parameter.
+1. **Model Struct Updates**
+   - Added fields `bulkQueue []string`, `bulkIndex int`, `bulkAction pm.Action`, and `bulkLogs bool` to `Model` struct in `internal/app/model.go` for queue state tracking.
 
-2. **Concrete Package Managers Update**
-   - Adapted the `RunAction` methods in [brew.go](file:///d:/Github%20repo/devpkgs/internal/pm/brew.go), [npm.go](file:///d:/Github%20repo/devpkgs/internal/pm/npm.go), [pip.go](file:///d:/Github%20repo/devpkgs/internal/pm/pip.go), and [winget.go](file:///d:/Github%20repo/devpkgs/internal/pm/winget.go) to pass the program channel parameter to `RunStream`, streaming logs and command results.
+2. **Trigger Key Handlers Modification**
+   - Updated cases `"u"` and `"x"` in the keyboard listener of `internal/app/update.go`:
+     - If not in `allMode` and active tab has selected items (`len(st.selected) > 0`), it compiles them into `m.bulkQueue` based on the display order in `st.displayPackages` (falling back to alphabetical order for any selected package that might be hidden or filtered out).
+     - Initializes `m.bulkIndex = 0`, sets `m.bulkAction` to `pm.Upgrade` or `pm.Remove`, sets `m.pendingTab` to `m.activeTab`, and sets `m.actionOverlay = true` to trigger confirmation.
+     - If selections are empty, falls back to the original single-package behavior and explicitly clears `m.bulkQueue`.
 
-3. **Event Loop & Keyboard Event Handlers Update**
-   - Updated [update.go](file:///d:/Github%20repo/devpkgs/internal/app/update.go):
-     - Inside `actionOverlay` key handler, case `"enter", "y"` triggers the new `RunAction` signature with `m.logChan` and initiates logs listening via `ListenLogs(m.logChan)`.
-     - Added case handlers for `pm.LogLineMsg` and `pm.LogFinishMsg`.
-     - In the main key handlers, checks `m.logOverlay` first for log-specific keyboard controls (scrolling with `up`/`down` keys, closing logs with `esc`/`l` when `!m.logActive`).
+3. **Confirmation Overlay Rendering**
+   - Modified `renderActionOverlay()` in `internal/app/overlays.go`:
+     - Checks if `len(m.bulkQueue) > 0` is active.
+     - Renders a custom confirmation overlay box with title `"Confirm bulk action"` and content specifying the capitalized action, selection count, and manager name.
+
+4. **Testing**
+   - Added unit test `TestBulkQueueAndConfirmation` in `internal/app/model_test.go` covering queue compilation, display ordering preservation, single-package fallback behavior, and rendering checks.
 
 ## Verification & Testing
 
-- Compilation check via `go build ./...` passed successfully with no warnings or errors.
-- Unit tests run using `go test ./...` passed successfully.
-
-## Task 3 Review Fixes (Fix Subagent Report)
-
-Resolved review findings for Task 3:
-
-1. **Stuck ActionMsg in Channel Buffer**:
-   - Modified `pm.LogFinishMsg` case handler in [update.go](file:///d:/Github%20repo/devpkgs/internal/app/update.go) to return `ListenLogs(m.logChan)` instead of `nil` to continue draining the channel, ensuring the subsequent `ActionMsg` is consumed and doesn't get stuck in the buffer.
-
-2. **Goroutine Leak when Pip is Not Found**:
-   - Updated `RunAction` in [pip.go](file:///d:/Github%20repo/devpkgs/internal/pm/pip.go). If `pip` is not resolved, instead of immediately returning a `tea.Msg` struct (bypassing the channels and leaving `ListenLogs` hanging), we spawn a quick goroutine that writes `LogFinishMsg` followed by `ActionMsg` directly to `programChan`. The cmd function then returns `nil`. This guarantees that `ListenLogs` is always drained and never blocks.
-
-3. **Line Width Formatting**:
-   - Checked and formatted modified files to ensure lines are within standard limits.
-
-### Verification & Testing after Fixes
-- All tests compiled and passed successfully (without cache) via `go test -count=1 ./...`.
-
+- Verification Command: `go build ./... && go test -v ./...`
+- Result: **PASS**
+- Unit tests pass successfully.

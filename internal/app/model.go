@@ -86,6 +86,11 @@ type Model struct {
 	actionStatus   string
 	outdatedOnly   bool
 
+	bulkQueue  []string
+	bulkIndex  int
+	bulkAction pm.Action
+	bulkLogs   bool
+
 	sparklineHistory []float64
 
 	logOverlay      bool

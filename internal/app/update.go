@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -392,6 +393,40 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = m.applyFilter()
 
 		case "u", "x":
+			if !m.allMode && len(m.states[m.activeTab].selected) > 0 {
+				st := &m.states[m.activeTab]
+				var queue []string
+				for _, pkg := range st.displayPackages {
+					if st.selected[pkg] {
+						queue = append(queue, pkg)
+					}
+				}
+				if len(queue) < len(st.selected) {
+					inQueue := make(map[string]bool)
+					for _, q := range queue {
+						inQueue[q] = true
+					}
+					var rest []string
+					for pkg := range st.selected {
+						if !inQueue[pkg] {
+							rest = append(rest, pkg)
+						}
+					}
+					sort.Strings(rest)
+					queue = append(queue, rest...)
+				}
+				action := pm.Upgrade
+				if msg.String() == "x" {
+					action = pm.Remove
+				}
+				m.bulkQueue = queue
+				m.bulkIndex = 0
+				m.bulkAction = action
+				m.pendingTab = m.activeTab
+				m.actionOverlay = true
+				return m, nil
+			}
+
 			if tabIndex, packageName, ok := m.selectedPackage(); ok {
 				if msg.String() == "u" {
 					if m.isUpToDate(tabIndex, packageName) {
@@ -402,6 +437,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.pendingAction = pm.Remove
 				}
+				m.bulkQueue = nil
 				m.pendingTab = tabIndex
 				m.pendingPackage = packageName
 				m.actionOverlay = true

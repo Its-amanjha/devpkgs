@@ -39,6 +39,16 @@ func (m Model) renderFooter() string {
 }
 
 func (m Model) renderActionOverlay() string {
+	if len(m.bulkQueue) > 0 {
+		action := string(m.bulkAction)
+		if len(action) > 0 {
+			action = strings.ToUpper(action[:1]) + action[1:]
+		}
+		content := fmt.Sprintf("%s %d packages using %s?\n\nEnter: confirm   y: with logs   Esc/n: cancel",
+			action, len(m.bulkQueue), m.tabs[m.pendingTab].Name())
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
+			renderPaneBox(60, 6, "Confirm bulk action", content))
+	}
 	action := string(m.pendingAction)
 	content := fmt.Sprintf("%s %q using %s?\n\nEnter: confirm   y: with logs   Esc/n: cancel", action, m.pendingPackage, m.tabs[m.pendingTab].Name())
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, renderPaneBox(60, 6, "Confirm package action", content))
