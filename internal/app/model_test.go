@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -406,6 +407,86 @@ func TestSequentialBulkActionExecutionSilent(t *testing.T) {
 	}
 	if cmd == nil {
 		t.Fatal("expected a non-nil batch command to start run")
+	}
+}
+
+func TestBulkActionWithErrors(t *testing.T) {
+	m := New()
+	m.allMode = false
+	m.activeTab = 0
+	for i := range m.states {
+		m.states[i].loading = false
+	}
+
+	m.states[0].packages = []string{"pkgA", "pkgB"}
+	m.states[0].displayPackages = []string{"pkgA", "pkgB"}
+	m.states[0].cursor = 0
+
+	// Select pkgA and pkgB
+	m.states[0].selected["pkgA"] = true
+	m.states[0].selected["pkgB"] = true
+
+	// Simulate pressing "x" key to uninstall bulk
+	mModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	m = mModel.(Model)
+
+	// Confirm with "enter" / "s"
+	mModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = mModel.(Model)
+	if cmd == nil {
+		t.Fatal("expected non-nil command")
+	}
+
+	// Simulate completion of first package (pkgA) without error
+	actionMsg1 := pm.ActionMsg{
+		Manager:     "brew",
+		PackageName: "pkgA",
+		Action:      pm.Remove,
+		Err:         nil,
+	}
+	mModel, cmd = m.Update(actionMsg1)
+	m = mModel.(Model)
+
+	if len(m.bulkErrors) != 0 {
+		t.Fatalf("expected 0 errors in bulkErrors, got %v", m.bulkErrors)
+	}
+
+	// Simulate completion of second package (pkgB) with error
+	errPkgB := fmt.Errorf("permission denied")
+	actionMsg2 := pm.ActionMsg{
+		Manager:     "brew",
+		PackageName: "pkgB",
+		Action:      pm.Remove,
+		Err:         errPkgB,
+	}
+	mModel, cmd = m.Update(actionMsg2)
+	m = mModel.(Model)
+
+	// Bulk queue is completed: bulkQueue should be nil, selections cleared
+	if m.bulkQueue != nil {
+		t.Fatalf("expected bulkQueue to be nil after completion, got %v", m.bulkQueue)
+	}
+	if len(m.states[0].selected) != 0 {
+		t.Fatalf("expected selections to be cleared, got %v", m.states[0].selected)
+	}
+	if !strings.Contains(m.actionStatus, "finished with 1 errors") {
+		t.Fatalf("expected action status to report 1 error, got '%s'", m.actionStatus)
+	}
+
+	if len(m.bulkErrors) != 1 || m.bulkErrors[0] != errPkgB.Error() {
+		t.Fatalf("expected 1 error in bulkErrors, got %v", m.bulkErrors)
+	}
+
+	// Check if error was appended to logLines
+	hasErrorInLogs := false
+	for _, log := range m.logLines {
+		if strings.Contains(log, "Error: permission denied") {
+			hasErrorInLogs = true
+			break
+		}
+	}
+	if !hasErrorInLogs {
+		t.Fatal("expected logLines to contain the error description")
 	}
 }
 

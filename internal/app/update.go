@@ -171,6 +171,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case pm.ActionMsg:
 		if msg.Err != nil {
 			m.actionStatus = fmt.Sprintf("%s failed for %s: %v", msg.Action, msg.PackageName, msg.Err)
+			if len(m.bulkQueue) > 0 {
+				m.bulkErrors = append(m.bulkErrors, msg.Err.Error())
+			}
+			m.logLines = append(m.logLines, fmt.Sprintf("Error: %v", msg.Err))
 		} else {
 			m.actionStatus = fmt.Sprintf("%s completed for %s", msg.Action, msg.PackageName)
 		}
@@ -451,6 +455,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.bulkQueue = queue
 				m.bulkIndex = 0
 				m.bulkAction = action
+				m.bulkErrors = nil
 				m.pendingTab = m.activeTab
 				m.actionOverlay = true
 				return m, nil

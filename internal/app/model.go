@@ -91,6 +91,7 @@ type Model struct {
 	bulkIndex  int
 	bulkAction pm.Action
 	bulkLogs   bool
+	bulkErrors []string
 
 	sparklineHistory []float64
 
@@ -401,8 +402,12 @@ func (m Model) startNextBulkAction() (Model, tea.Cmd) {
 		// All done — clear selections and clear bulk state
 		m.states[m.pendingTab].selected = make(map[string]bool)
 		m.bulkQueue = nil
-		m.actionStatus = fmt.Sprintf("Bulk %s completed for %d packages", m.bulkAction, m.bulkIndex)
-		return m, m.tabs[m.pendingTab].ListInstalled()
+		if len(m.bulkErrors) > 0 {
+			m.actionStatus = fmt.Sprintf("Bulk %s finished with %d errors (check logs with 'l')", m.bulkAction, len(m.bulkErrors))
+		} else {
+			m.actionStatus = fmt.Sprintf("Bulk %s completed for %d packages", m.bulkAction, m.bulkIndex)
+		}
+		return m.refreshTab(m.tabs[m.pendingTab].Name())
 	}
 
 	pkg := m.bulkQueue[m.bulkIndex]
