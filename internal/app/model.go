@@ -217,30 +217,37 @@ func (m Model) tabForPackage(packageName string) int {
 	return -1
 }
 
+func (m Model) resolveLatestVersion(tabIndex int, packageName string) string {
+	if tabIndex < 0 {
+		return ""
+	}
+	switch m.tabs[tabIndex].Name() {
+	case "brew":
+		if info := m.states[tabIndex].Brew; info != nil && info.FormulaeMap[packageName].Versions.Stable != "" {
+			return info.FormulaeMap[packageName].Versions.Stable
+		}
+	case "npm":
+		if info := m.states[tabIndex].NpmDetails[packageName]; info != nil {
+			return info.Version
+		}
+	case "pip":
+		if info := m.states[tabIndex].PipDetails[packageName]; info != nil {
+			return info.Version
+		}
+	case "winget":
+		if info := m.states[tabIndex].WingetDetails[packageName]; info != nil {
+			return info.Version
+		}
+	}
+	return ""
+}
+
 func (m Model) isOutdated(tabIndex int, packageName string) bool {
 	if tabIndex < 0 {
 		return false
 	}
 	installed := m.states[tabIndex].versions[packageName]
-	latest := ""
-	switch m.tabs[tabIndex].Name() {
-	case "brew":
-		if info := m.states[tabIndex].Brew; info != nil && info.FormulaeMap[packageName].Versions.Stable != "" {
-			latest = info.FormulaeMap[packageName].Versions.Stable
-		}
-	case "npm":
-		if info := m.states[tabIndex].NpmDetails[packageName]; info != nil {
-			latest = info.Version
-		}
-	case "pip":
-		if info := m.states[tabIndex].PipDetails[packageName]; info != nil {
-			latest = info.Version
-		}
-	case "winget":
-		if info := m.states[tabIndex].WingetDetails[packageName]; info != nil {
-			latest = info.Version
-		}
-	}
+	latest := m.resolveLatestVersion(tabIndex, packageName)
 	return installed != "" && latest != "" && installed != latest
 }
 
@@ -249,27 +256,10 @@ func (m Model) isUpToDate(tabIndex int, packageName string) bool {
 		return false
 	}
 	installed := m.states[tabIndex].versions[packageName]
-	latest := ""
-	switch m.tabs[tabIndex].Name() {
-	case "brew":
-		if info := m.states[tabIndex].Brew; info != nil && info.FormulaeMap[packageName].Versions.Stable != "" {
-			latest = info.FormulaeMap[packageName].Versions.Stable
-		}
-	case "npm":
-		if info := m.states[tabIndex].NpmDetails[packageName]; info != nil {
-			latest = info.Version
-		}
-	case "pip":
-		if info := m.states[tabIndex].PipDetails[packageName]; info != nil {
-			latest = info.Version
-		}
-	case "winget":
-		if info := m.states[tabIndex].WingetDetails[packageName]; info != nil {
-			latest = info.Version
-		}
-	}
+	latest := m.resolveLatestVersion(tabIndex, packageName)
 	return installed != "" && latest != "" && installed == latest
 }
+
 
 func (m Model) selectedPackage() (int, string, bool) {
 	if m.allMode {
