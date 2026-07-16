@@ -14,12 +14,10 @@ var (
 	ResultStyle         lipgloss.Style
 	FooterStyle         lipgloss.Style
 	LoadingStyle        lipgloss.Style
-	LoadingCountStyle   lipgloss.Style
 	ErrorStyle          lipgloss.Style
 	DetailTitleStyle    lipgloss.Style
 	DetailLabelStyle    lipgloss.Style
 	DetailValueStyle    lipgloss.Style
-	DetailSectionStyle  lipgloss.Style
 	SearchBarStyle      lipgloss.Style
 	SearchPlaceholderStyle lipgloss.Style
 	LinkStyle           lipgloss.Style
@@ -55,10 +53,6 @@ func applyTheme(t *Theme) {
 		Foreground(violet).
 		Italic(true)
 
-	LoadingCountStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(violet)
-
 	ErrorStyle = lipgloss.NewStyle().
 		Foreground(t.Error).
 		Bold(true)
@@ -73,11 +67,6 @@ func applyTheme(t *Theme) {
 
 	DetailValueStyle = lipgloss.NewStyle().
 		Foreground(t.DetailText)
-
-	DetailSectionStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(violet).
-		Padding(0, 1)
 
 	SearchBarStyle = lipgloss.NewStyle().
 		Foreground(violet).

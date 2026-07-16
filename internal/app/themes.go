@@ -5,7 +5,6 @@ import "github.com/charmbracelet/lipgloss"
 type Theme struct {
 	Name        string
 	Description string
-	URL         string
 
 	Primary    lipgloss.Color
 	Muted      lipgloss.Color

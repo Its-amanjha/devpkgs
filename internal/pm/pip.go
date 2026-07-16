@@ -29,7 +29,6 @@ type PipDetailData struct {
 	License     string `json:"license"`
 	HomePage    string `json:"home_page"`
 	Author      string `json:"author"`
-	AuthorEmail string `json:"author_email"`
 }
 
 type PipAllDetailsMsg map[string]*PipDetailData
@@ -74,9 +73,13 @@ func (p *PipManager) RunAction(name string, action Action, programChan chan<- te
 			return nil
 		}
 	}
-	args := append(prefix, "install", "--upgrade", name)
+	var args []string
 	if action == Remove {
 		args = append(prefix, "uninstall", "-y", name)
+	} else if action == Install {
+		args = append(prefix, "install", name)
+	} else {
+		args = append(prefix, "install", "--upgrade", name)
 	}
 	return RunStream(programChan, name, action, "pip", cmd, args...)
 }

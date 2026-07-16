@@ -779,17 +779,3 @@ func (m Model) renderSearchRightPanel(width, height int) string {
 	content := strings.Join(contentLines, "\n")
 	return renderPaneBox(width, height, "Details", content)
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}

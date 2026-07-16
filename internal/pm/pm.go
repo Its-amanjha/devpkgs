@@ -20,6 +20,7 @@ type Action string
 const (
 	Upgrade Action = "upgrade"
 	Remove  Action = "remove"
+	Install Action = "install"
 )
 
 type PackageListMsg struct {
@@ -34,16 +35,6 @@ type ActionMsg struct {
 	Action      Action
 	Manager     string
 	Err         error
-}
-
-func Run(packageName string, action Action, manager string, name string, args ...string) tea.Cmd {
-	return func() tea.Msg {
-		_, err := exec.Command(name, args...).CombinedOutput()
-		if err != nil {
-			return ActionMsg{PackageName: packageName, Action: action, Manager: manager, Err: err}
-		}
-		return ActionMsg{PackageName: packageName, Action: action, Manager: manager}
-	}
 }
 
 type LogLineMsg struct {

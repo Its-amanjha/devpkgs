@@ -177,10 +177,3 @@ func SearchPip(query string) tea.Cmd {
 		return RegistrySearchMsg{Manager: "pip", Results: nil}
 	}
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
