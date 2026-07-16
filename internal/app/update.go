@@ -159,6 +159,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case pm.LogLineMsg:
+		m.logLines = append(m.logLines, msg.Line)
+		return m, ListenLogs(m.logChan)
+
+	case pm.LogFinishMsg:
+		m.logActive = false
+		return m, nil
+
 	case pm.ActionMsg:
 		if msg.Err != nil {
 			m.actionStatus = fmt.Sprintf("%s failed for %s: %v", msg.Action, msg.PackageName, msg.Err)
@@ -193,6 +201,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tickCmd()
 
 	case tea.KeyMsg:
+		if m.logOverlay {
+			switch msg.String() {
+			case "esc", "l":
+				if !m.logActive {
+					m.logOverlay = false
+				}
+				return m, nil
+			case "up":
+				m.logScrollActive = true
+				if m.logScrollOffset < len(m.logLines)-1 {
+					m.logScrollOffset++
+				}
+				return m, nil
+			case "down":
+				if m.logScrollOffset > 0 {
+					m.logScrollOffset--
+				}
+				if m.logScrollOffset == 0 {
+					m.logScrollActive = false
+				}
+				return m, nil
+			default:
+				return m, nil
+			}
+		}
 		if m.actionOverlay {
 			switch msg.String() {
 			case "esc", "n":
@@ -200,7 +233,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "enter", "y":
 				m.actionOverlay = false
-				return m, m.tabs[m.pendingTab].RunAction(m.pendingPackage, m.pendingAction)
+				m.logOverlay = true
+				m.logLines = nil
+				m.logScrollOffset = 0
+				m.logScrollActive = false
+				m.logActive = true
+				cmd := m.tabs[m.pendingTab].RunAction(m.pendingPackage, m.pendingAction, m.logChan)
+				return m, tea.Batch(cmd, ListenLogs(m.logChan))
 			default:
 				return m, nil
 			}

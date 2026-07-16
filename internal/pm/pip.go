@@ -62,7 +62,7 @@ func (p *PipManager) ListInstalled() tea.Cmd {
 	}
 }
 
-func (p *PipManager) RunAction(name string, action Action) tea.Cmd {
+func (p *PipManager) RunAction(name string, action Action, programChan chan<- tea.Msg) tea.Cmd {
 	cmd, prefix := p.resolve()
 	if cmd == "" {
 		return func() tea.Msg { return ActionMsg{PackageName: name, Action: action, Manager: "pip", Err: fmt.Errorf("pip not found")} }
@@ -71,7 +71,7 @@ func (p *PipManager) RunAction(name string, action Action) tea.Cmd {
 	if action == Remove {
 		args = append(prefix, "uninstall", "-y", name)
 	}
-	return Run(name, action, "pip", cmd, args...)
+	return RunStream(programChan, name, action, "pip", cmd, args...)
 }
 
 func (p *PipManager) resolve() (string, []string) {

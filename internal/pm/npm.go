@@ -64,11 +64,11 @@ func (n *NpmManager) ListInstalled() tea.Cmd {
 	}
 }
 
-func (n *NpmManager) RunAction(name string, action Action) tea.Cmd {
+func (n *NpmManager) RunAction(name string, action Action, programChan chan<- tea.Msg) tea.Cmd {
 	if action == Remove {
-		return Run(name, action, "npm", "npm", "uninstall", "-g", name)
+		return RunStream(programChan, name, action, "npm", "npm", "uninstall", "-g", name)
 	}
-	return Run(name, action, "npm", "npm", "update", "-g", name)
+	return RunStream(programChan, name, action, "npm", "npm", "update", "-g", name)
 }
 
 func FetchAllNpmDetails(names []string) tea.Cmd {

@@ -11,7 +11,7 @@ type Manager interface {
 	Name() string
 	TabLabel() string
 	ListInstalled() tea.Cmd
-	RunAction(packageName string, action Action) tea.Cmd
+	RunAction(packageName string, action Action, programChan chan<- tea.Msg) tea.Cmd
 }
 
 type Action string

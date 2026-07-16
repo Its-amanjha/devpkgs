@@ -36,12 +36,12 @@ func (w *WingetManager) ListInstalled() tea.Cmd {
 	}
 }
 
-func (w *WingetManager) RunAction(packageName string, action Action) tea.Cmd {
+func (w *WingetManager) RunAction(packageName string, action Action, programChan chan<- tea.Msg) tea.Cmd {
 	args := []string{"upgrade", "--id", packageName, "--exact", "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"}
 	if action == Remove {
 		args = []string{"uninstall", "--id", packageName, "--exact", "--disable-interactivity"}
 	}
-	return Run(packageName, action, "winget", "winget", args...)
+	return RunStream(programChan, packageName, action, "winget", "winget", args...)
 }
 
 func parseWingetExport(data []byte) ([]string, map[string]string, error) {

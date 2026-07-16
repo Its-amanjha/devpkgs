@@ -52,11 +52,11 @@ func (b *BrewManager) ListInstalled() tea.Cmd {
 	return tea.Batch(b.fetchList(), b.fetchFormulae())
 }
 
-func (b *BrewManager) RunAction(name string, action Action) tea.Cmd {
+func (b *BrewManager) RunAction(name string, action Action, programChan chan<- tea.Msg) tea.Cmd {
 	if action == Remove {
-		return Run(name, action, "brew", "brew", "uninstall", name)
+		return RunStream(programChan, name, action, "brew", "brew", "uninstall", name)
 	}
-	return Run(name, action, "brew", "brew", "upgrade", name)
+	return RunStream(programChan, name, action, "brew", "brew", "upgrade", name)
 }
 
 func (b *BrewManager) fetchList() tea.Cmd {
