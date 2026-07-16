@@ -62,7 +62,7 @@ func (m Model) renderAllLeftPanel(width int, boxHeight int) string {
 		end = len(m.allDisplayPackages)
 	}
 
-	typeWidth := 5
+	typeWidth := 6
 	innerWidth := width - 4
 
 	pmBadge := func(name string) lipgloss.Style {
