@@ -194,6 +194,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.actionStatus = fmt.Sprintf("%s completed for %s", msg.Action, msg.PackageName)
 		}
 
+		if msg.Action == pm.Install && msg.Err == nil {
+			m.searchTabActive = false
+			m.allMode = false
+			for idx, tab := range m.tabs {
+				if tab.Name() == msg.Manager {
+					m.activeTab = idx
+					break
+				}
+			}
+		}
+
 		// If in bulk mode, advance to next package
 		if len(m.bulkQueue) > 0 {
 			m.bulkIndex++
@@ -331,8 +342,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "esc":
 				if m.searchTabActive {
-					m.searchQuery = ""
-					m = m.applyFilter()
+					m.searchActive = false
 					return m, nil
 				}
 				m.searchActive = false
@@ -345,6 +355,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.searchResults = nil
 					m.searchResultCursor = 0
 					m.searchActiveWorkers = 4 // 4 workers: brew, winget, npm, pip
+					m.searchActive = false    // Unfocus search bar on search start
 					cmds := []tea.Cmd{
 						pm.SearchNpm(m.searchQuery),
 						pm.SearchWinget(m.searchQuery),
@@ -361,14 +372,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.searchActive = false
 				return m, nil
 			case "left", "right":
+				if m.searchTabActive {
+					if msg.String() == "left" {
+						m.searchTabActive = false
+						m.activeTab = len(m.tabs) - 1
+						m.searchActive = false
+						m.searchQuery = ""
+						m.searchResults = nil
+						m.searchResultCursor = 0
+						m.searchLoading = false
+						m.searchActiveWorkers = 0
+						return m, m.selectPackageCmd()
+					}
+					return m, nil
+				}
 				return m, nil
-			case "backspace":
+			case "backspace", "ctrl+h":
 				if len(m.searchQuery) > 0 {
 					m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
 					m = m.applyFilter()
 				}
 				return m, nil
 			case "up":
+				if m.searchTabActive {
+					if m.searchResultCursor > 0 {
+						m.searchResultCursor--
+					}
+					return m, nil
+				}
 				if m.allMode {
 					if m.allCursor > 0 {
 						m.allCursor--
@@ -383,6 +414,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			case "down":
+				if m.searchTabActive {
+					if m.searchResultCursor < len(m.searchResults)-1 {
+						m.searchResultCursor++
+					}
+					return m, nil
+				}
 				if m.allMode {
 					if m.allCursor < len(m.allDisplayPackages)-1 {
 						m.allCursor++
@@ -408,6 +445,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+
+		case "backspace", "ctrl+h":
+			if m.searchQuery != "" || m.searchTabActive {
+				m.searchActive = true
+				if len(m.searchQuery) > 0 {
+					m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+					m = m.applyFilter()
+				}
+				return m, nil
+			}
 
 		case "l":
 			if len(m.logLines) > 0 && !m.logActive {
@@ -446,9 +493,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "/":
-			if !m.searchTabActive {
-				m.searchActive = true
-				m.searchQuery = ""
+			m.searchActive = true
+			m.searchQuery = ""
+			return m, nil
+
+		case "i":
+			if m.searchTabActive && len(m.searchResults) > 0 {
+				res := m.searchResults[m.searchResultCursor]
+				m.pendingAction = pm.Install
+				managerIndex := -1
+				for idx, tab := range m.tabs {
+					if tab.Name() == res.Manager {
+						managerIndex = idx
+						break
+					}
+				}
+				if managerIndex == -1 {
+					managerIndex = 0
+				}
+				m.pendingTab = managerIndex
+				m.pendingPackage = res.Name
+				m.actionOverlay = true
+				m.bulkQueue = nil
+				return m, nil
 			}
 
 		case "r":

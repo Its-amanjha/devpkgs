@@ -560,5 +560,99 @@ func TestSearchUI(t *testing.T) {
 	}
 }
 
+func TestSearchInstallFlow(t *testing.T) {
+	// Initialize Model
+	m := New()
+
+	m.searchTabActive = true
+	m.searchActive = false
+	m.searchResults = []pm.SearchResult{
+		{
+			Name:        "git",
+			Manager:     "winget",
+			Description: "Fast distributed version control system",
+			Version:     "2.40.0",
+		},
+	}
+	m.searchResultCursor = 0
+
+	// Pressing "i" should trigger actionOverlay
+	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	m = updatedModel.(Model)
+	if cmd != nil {
+		t.Fatal("expected nil command on action overlay trigger")
+	}
+	if !m.actionOverlay {
+		t.Fatal("expected action overlay to be active")
+	}
+	if m.pendingAction != pm.Install {
+		t.Fatalf("expected pending action to be Install, got %v", m.pendingAction)
+	}
+	if m.pendingPackage != "git" {
+		t.Fatalf("expected pending package to be git, got %s", m.pendingPackage)
+	}
+
+	// Pressing "y" on actionOverlay should start the installation action and open logs overlay
+	updatedModel, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m = updatedModel.(Model)
+	if cmd == nil {
+		t.Fatal("expected non-nil command for installation run")
+	}
+	if m.actionOverlay {
+		t.Fatal("expected action overlay to be closed")
+	}
+	if !m.logOverlay {
+		t.Fatal("expected log overlay to be active")
+	}
+	if !m.logActive {
+		t.Fatal("expected logs to be active")
+	}
+
+	// Simulate ActionMsg completion of pm.Install
+	msg := pm.ActionMsg{
+		Action:      pm.Install,
+		PackageName: "git",
+		Manager:     "winget",
+		Err:         nil,
+	}
+	updatedModel, cmd = m.Update(msg)
+	m = updatedModel.(Model)
+	
+	// Assert searchTabActive is closed and activeTab is switched to winget (index 3)
+	if m.searchTabActive {
+		t.Fatal("expected searchTabActive to be false after successful install")
+	}
+	if m.activeTab != 3 {
+		t.Fatalf("expected activeTab to be 3 (winget), got %d", m.activeTab)
+	}
+}
+
+func TestSearchBackspaceHandling(t *testing.T) {
+	m := New()
+	m.searchTabActive = true
+	m.searchActive = false
+	m.searchQuery = "golang"
+
+	// 1. Press backspace when unfocused (should focus search and delete last character)
+	updatedModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	m = updatedModel.(Model)
+	if !m.searchActive {
+		t.Fatal("expected searchActive to be true after backspace on active search query")
+	}
+	if m.searchQuery != "golan" {
+		t.Fatalf("expected searchQuery to be 'golan', got %s", m.searchQuery)
+	}
+
+	// 2. Press ctrl+h when focused (should delete last character)
+	m.searchActive = true
+	updatedModel, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlH})
+	m = updatedModel.(Model)
+	if m.searchQuery != "gola" {
+		t.Fatalf("expected searchQuery to be 'gola' after ctrl+h, got %s", m.searchQuery)
+	}
+}
+
+
+
 
 
