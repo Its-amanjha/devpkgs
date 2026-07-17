@@ -8,10 +8,17 @@ import (
 func TestParseWingetList(t *testing.T) {
 	output := `Name                           Id                                       Version          Available        Source
 ----------------------------------------------------------------------------------------------------------------
-Git                            Git.Git                                  2.54.0           2.55.0           winget`
+Git                            Git.Git                                  2.54.0           2.55.0           winget
+ShortPkg                       Short.Id                                 1.0.0`
 	names, versions := parseWingetList(output)
-	if len(names) != 1 || versions["Git.Git"] != "2.54.0" {
-		t.Fatalf("unexpected list parse: %v, %v", names, versions)
+	if len(names) != 2 {
+		t.Fatalf("expected 2 packages, got %d: %v", len(names), names)
+	}
+	if versions["Git.Git"] != "2.54.0" {
+		t.Errorf("Git.Git version = %q, want '2.54.0'", versions["Git.Git"])
+	}
+	if versions["Short.Id"] != "1.0.0" {
+		t.Errorf("Short.Id version = %q, want '1.0.0'", versions["Short.Id"])
 	}
 }
 

@@ -70,13 +70,22 @@ func parseWingetList(output string) ([]string, map[string]string) {
 	
 	// Parse data rows
 	for i := sepIdx + 1; i < len(lines); i++ {
-		line := lines[i]
-		if len(line) < versionIdx {
+		line := strings.TrimRight(lines[i], "\r\n")
+		if len(line) <= idIdx {
 			continue
 		}
-		id := strings.TrimSpace(line[idIdx:min(versionIdx, len(line))])
+		
+		idEnd := versionIdx
+		if idEnd > len(line) {
+			idEnd = len(line)
+		}
+		id := strings.TrimSpace(line[idIdx:idEnd])
+		if id == "" {
+			continue
+		}
+		
 		version := ""
-		if versionIdx < len(line) {
+		if len(line) > versionIdx {
 			availableIdx := strings.Index(header, "Available")
 			if availableIdx > versionIdx && availableIdx < len(line) {
 				version = strings.TrimSpace(line[versionIdx:availableIdx])
@@ -87,9 +96,7 @@ func parseWingetList(output string) ([]string, map[string]string) {
 				}
 			}
 		}
-		if id == "" {
-			continue
-		}
+		
 		if _, exists := versions[id]; !exists {
 			names = append(names, id)
 		}
