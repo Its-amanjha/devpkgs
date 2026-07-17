@@ -154,10 +154,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case pm.WingetDetailMsg:
 		st := &m.states[3]
-		if msg.Err == nil && msg.Data != nil {
-			if st.WingetDetails == nil {
-				st.WingetDetails = make(map[string]*pm.WingetDetailData)
+		if st.WingetDetails == nil {
+			st.WingetDetails = make(map[string]*pm.WingetDetailData)
+		}
+		if msg.Err != nil {
+			st.WingetDetails[msg.PackageID] = &pm.WingetDetailData{
+				ID:          msg.PackageID,
+				Description: "Details unavailable. This is a system registry package, not found in the WinGet public repository.",
 			}
+		} else if msg.Data != nil {
 			st.WingetDetails[msg.PackageID] = msg.Data
 		}
 		return m, nil

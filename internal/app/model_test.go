@@ -652,6 +652,33 @@ func TestSearchBackspaceHandling(t *testing.T) {
 	}
 }
 
+func TestWingetDetailErrorCaching(t *testing.T) {
+	m := New()
+	
+	// Send WingetDetailMsg with error
+	errPkg := "MSIX\\System.Package"
+	msg := pm.WingetDetailMsg{
+		PackageID: errPkg,
+		Err:       fmt.Errorf("no package found"),
+	}
+	
+	updatedModel, _ := m.Update(msg)
+	m = updatedModel.(Model)
+	
+	st := m.states[3] // winget tab
+	if st.WingetDetails == nil {
+		t.Fatal("expected WingetDetails map to be initialized")
+	}
+	
+	detail, exists := st.WingetDetails[errPkg]
+	if !exists {
+		t.Fatal("expected error package details to be cached")
+	}
+	if !strings.Contains(detail.Description, "Details unavailable") {
+		t.Fatalf("expected placeholder error description, got: %q", detail.Description)
+	}
+}
+
 
 
 

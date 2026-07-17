@@ -104,19 +104,27 @@ func SearchWinget(query string) tea.Cmd {
 		}
 		// Parse data rows
 		for i := sepIdx + 1; i < len(lines); i++ {
-			line := lines[i]
-			if len(line) < versionIdx {
+			line := strings.TrimRight(lines[i], "\r\n")
+			if len(line) <= idIdx {
 				continue
 			}
-			id := strings.TrimSpace(line[idIdx:min(versionIdx, len(line))])
-			version := ""
-			if versionIdx < len(line) {
-				version = strings.TrimSpace(line[versionIdx:])
+			
+			idEnd := versionIdx
+			if idEnd > len(line) {
+				idEnd = len(line)
 			}
-			name := strings.TrimSpace(line[nameIdx:min(idIdx, len(line))])
+			id := strings.TrimSpace(line[idIdx:idEnd])
 			if id == "" {
 				continue
 			}
+			
+			version := ""
+			if len(line) > versionIdx {
+				version = strings.TrimSpace(line[versionIdx:])
+			}
+			
+			name := strings.TrimSpace(line[nameIdx:min(idIdx, len(line))])
+			
 			results = append(results, SearchResult{
 				Name:        id,
 				Manager:     "winget",
