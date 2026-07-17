@@ -164,6 +164,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case pm.RegistrySearchMsg:
 		if msg.Err == nil {
+			if msg.Manager == "brew" && msg.FormulaeMap != nil {
+				st := &m.states[0]
+				if st.Brew != nil {
+					st.Brew.FormulaeMap = msg.FormulaeMap
+					st.Brew.FormulaeReady = true
+					st.Brew.BrewFormulaeDone = true
+				}
+			}
 			m.searchResults = append(m.searchResults, msg.Results...)
 			sort.Slice(m.searchResults, func(i, j int) bool {
 				return m.searchResults[i].Name < m.searchResults[j].Name

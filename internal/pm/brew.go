@@ -2,11 +2,10 @@ package pm
 
 import (
 	"encoding/json"
-	"net/http"
+	"os"
 	"os/exec"
-	"strconv"
+	"path/filepath"
 	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -56,6 +55,9 @@ func (b *BrewManager) RunAction(name string, action Action, programChan chan<- t
 	if action == Remove {
 		return RunStream(programChan, name, action, "brew", "brew", "uninstall", name)
 	}
+	if action == Install {
+		return RunStream(programChan, name, action, "brew", "brew", "install", name)
+	}
 	return RunStream(programChan, name, action, "brew", "brew", "upgrade", name)
 }
 
@@ -86,14 +88,7 @@ func (b *BrewManager) fetchList() tea.Cmd {
 				if err == nil && prefix != "" {
 					path := prefix + "/opt/" + name
 					paths[name] = path
-					if duOut, duErr := exec.Command("du", "-skL", path).Output(); duErr == nil {
-						duFields := strings.Fields(string(duOut))
-						if len(duFields) > 0 {
-							if kb, parseErr := strconv.ParseInt(duFields[0], 10, 64); parseErr == nil {
-								sizes[name] = kb * 1024
-							}
-						}
-					}
+					sizes[name] = getDirSize(path)
 				}
 			}
 		}
@@ -103,22 +98,40 @@ func (b *BrewManager) fetchList() tea.Cmd {
 
 func (b *BrewManager) fetchFormulae() tea.Cmd {
 	return func() tea.Msg {
-		client := &http.Client{Timeout: 15 * time.Second}
-		resp, err := client.Get("https://formulae.brew.sh/api/formula.json")
+		out, err := exec.Command("brew", "info", "--json=v2", "--installed").Output()
 		if err != nil {
 			return BrewFormulaeErrMsg(err)
 		}
-		defer resp.Body.Close()
 
-		var rawList []FormulaData
-		if err := json.NewDecoder(resp.Body).Decode(&rawList); err != nil {
+		var info struct {
+			Formulae []FormulaData `json:"formulae"`
+		}
+		if err := json.Unmarshal(out, &info); err != nil {
 			return BrewFormulaeErrMsg(err)
 		}
 
 		m := make(map[string]FormulaData)
-		for _, f := range rawList {
+		for _, f := range info.Formulae {
 			m[f.Name] = f
 		}
 		return BrewFormulaeMsg(m)
 	}
 }
+
+func getDirSize(path string) int64 {
+	var size int64
+	_ = filepath.WalkDir(path, func(_ string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			info, err := d.Info()
+			if err == nil {
+				size += info.Size()
+			}
+		}
+		return nil
+	})
+	return size
+}
+

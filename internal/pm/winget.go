@@ -1,8 +1,6 @@
 package pm
 
 import (
-	"encoding/json"
-	"os"
 	"os/exec"
 	"strings"
 
@@ -20,50 +18,84 @@ func (w *WingetManager) ListInstalled() tea.Cmd {
 		if _, err := exec.LookPath("winget"); err != nil {
 			return PackageListMsg{TabIndex: w.tabIndex}
 		}
-		file, err := os.CreateTemp("", "devpkgs-winget-*.json")
-		if err != nil { return PackageListMsg{Err: err, TabIndex: w.tabIndex} }
-		path := file.Name()
-		file.Close()
-		os.Remove(path)
-		defer os.Remove(path)
-		if err := exec.Command("winget", "export", "--output", path, "--include-versions", "--accept-source-agreements", "--disable-interactivity").Run(); err != nil {
+		out, err := exec.Command("winget", "list", "--accept-source-agreements", "--disable-interactivity").Output()
+		if err != nil {
 			return PackageListMsg{Err: err, TabIndex: w.tabIndex}
 		}
-		data, err := os.ReadFile(path)
-		if err != nil { return PackageListMsg{Err: err, TabIndex: w.tabIndex} }
-		names, versions, err := parseWingetExport(data)
-		return PackageListMsg{Packages: names, Versions: versions, Err: err, TabIndex: w.tabIndex}
+		names, versions := parseWingetList(string(out))
+		return PackageListMsg{Packages: names, Versions: versions, TabIndex: w.tabIndex}
 	}
 }
 
 func (w *WingetManager) RunAction(packageName string, action Action, programChan chan<- tea.Msg) tea.Cmd {
-	args := []string{"upgrade", "--id", packageName, "--exact", "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"}
+	var args []string
 	if action == Remove {
 		args = []string{"uninstall", "--id", packageName, "--exact", "--disable-interactivity"}
+	} else if action == Install {
+		args = []string{"install", "--id", packageName, "--exact", "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"}
+	} else {
+		args = []string{"upgrade", "--id", packageName, "--exact", "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"}
 	}
 	return RunStream(programChan, packageName, action, "winget", "winget", args...)
 }
 
-func parseWingetExport(data []byte) ([]string, map[string]string, error) {
-	var export struct {
-		Sources []struct {
-			Packages []struct {
-				ID      string `json:"PackageIdentifier"`
-				Version string `json:"Version"`
-			} `json:"Packages"`
-		} `json:"Sources"`
-	}
-	if err := json.Unmarshal(data, &export); err != nil { return nil, nil, err }
-	versions := map[string]string{}
+func parseWingetList(output string) ([]string, map[string]string) {
 	var names []string
-	for _, source := range export.Sources {
-		for _, pkg := range source.Packages {
-			if pkg.ID == "" { continue }
-			if _, exists := versions[pkg.ID]; !exists { names = append(names, pkg.ID) }
-			versions[pkg.ID] = pkg.Version
+	versions := make(map[string]string)
+	lines := strings.Split(output, "\n")
+	
+	// Find the separator line (all dashes)
+	sepIdx := -1
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if len(trimmed) > 10 && strings.Count(trimmed, "-") > len(trimmed)/2 {
+			sepIdx = i
+			break
 		}
 	}
-	return names, versions, nil
+	if sepIdx < 1 {
+		return nil, nil
+	}
+	
+	// Parse header to find column positions
+	header := lines[sepIdx-1]
+	idIdx := strings.Index(header, "Id")
+	if idIdx < 0 {
+		idIdx = strings.Index(header, "ID")
+	}
+	versionIdx := strings.Index(header, "Version")
+	if idIdx < 0 || versionIdx < 0 {
+		return nil, nil
+	}
+	
+	// Parse data rows
+	for i := sepIdx + 1; i < len(lines); i++ {
+		line := lines[i]
+		if len(line) < versionIdx {
+			continue
+		}
+		id := strings.TrimSpace(line[idIdx:min(versionIdx, len(line))])
+		version := ""
+		if versionIdx < len(line) {
+			availableIdx := strings.Index(header, "Available")
+			if availableIdx > versionIdx && availableIdx < len(line) {
+				version = strings.TrimSpace(line[versionIdx:availableIdx])
+			} else {
+				fields := strings.Fields(line[versionIdx:])
+				if len(fields) > 0 {
+					version = fields[0]
+				}
+			}
+		}
+		if id == "" {
+			continue
+		}
+		if _, exists := versions[id]; !exists {
+			names = append(names, id)
+		}
+		versions[id] = version
+	}
+	return names, versions
 }
 
 type WingetDetailData struct {

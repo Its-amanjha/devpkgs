@@ -149,7 +149,7 @@ func TestSearchBrewLocal(t *testing.T) {
 }
 
 func TestSearchBrewEmptyMap(t *testing.T) {
-	cmd := SearchBrew("test", nil)
+	cmd := SearchBrew("test", map[string]FormulaData{})
 	msg := cmd()
 	result, ok := msg.(RegistrySearchMsg)
 	if !ok {

@@ -20,13 +20,33 @@ type SearchResult struct {
 }
 
 type RegistrySearchMsg struct {
-	Manager string
-	Results []SearchResult
-	Err     error
+	Manager     string
+	Results     []SearchResult
+	FormulaeMap map[string]FormulaData
+	Err         error
 }
 
 func SearchBrew(query string, formulaeMap map[string]FormulaData) tea.Cmd {
 	return func() tea.Msg {
+		if formulaeMap == nil {
+			client := &http.Client{Timeout: 15 * time.Second}
+			resp, err := client.Get("https://formulae.brew.sh/api/formula.json")
+			if err != nil {
+				return RegistrySearchMsg{Manager: "brew", Err: err}
+			}
+			defer resp.Body.Close()
+
+			var rawList []FormulaData
+			if err := json.NewDecoder(resp.Body).Decode(&rawList); err != nil {
+				return RegistrySearchMsg{Manager: "brew", Err: err}
+			}
+
+			formulaeMap = make(map[string]FormulaData)
+			for _, f := range rawList {
+				formulaeMap[f.Name] = f
+			}
+		}
+
 		query = strings.ToLower(query)
 		var results []SearchResult
 		for name, data := range formulaeMap {
@@ -46,7 +66,7 @@ func SearchBrew(query string, formulaeMap map[string]FormulaData) tea.Cmd {
 		if len(results) > 25 {
 			results = results[:25]
 		}
-		return RegistrySearchMsg{Manager: "brew", Results: results}
+		return RegistrySearchMsg{Manager: "brew", Results: results, FormulaeMap: formulaeMap}
 	}
 }
 
