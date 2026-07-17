@@ -108,7 +108,7 @@ func (m Model) renderAllLeftPanel(width int, boxHeight int) string {
 
 		originRendered := pmBadge(origin).Render(origin)
 		
-		maxPkgLen := innerWidth - 6
+		maxPkgLen := innerWidth - 7
 		displayPkg := truncateString(pkg, maxPkgLen)
 		
 		var pkgRendered string

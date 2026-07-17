@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -677,6 +678,155 @@ func TestWingetDetailErrorCaching(t *testing.T) {
 	if !strings.Contains(detail.Description, "Details unavailable") {
 		t.Fatalf("expected placeholder error description, got: %q", detail.Description)
 	}
+}
+
+func TestModelBuildDebug(t *testing.T) {
+	content, err := os.ReadFile("C:/Users/amanj/.gemini/antigravity/brain/bf324dac-9e54-4317-b1bf-c6d283255bae/.system_generated/tasks/task-2218.log")
+	if err != nil {
+		t.Logf("Skipping TestModelBuildDebug as log file is not readable: %v", err)
+		return
+	}
+
+	names, versions := parseWingetListForTest(string(content))
+	t.Logf("Parsed %d names from winget log", len(names))
+
+	m := New()
+	m.activeTab = 3 // winget tab
+	
+	msg3 := pm.PackageListMsg{
+		TabIndex: 3,
+		Packages: names,
+		Versions: versions,
+	}
+	model, _ := m.Update(msg3)
+	m = model.(Model)
+
+	msg2 := pm.PackageListMsg{
+		TabIndex: 2,
+		Packages: []string{"aiohttp", "requests", "urllib3"},
+		Versions: map[string]string{"aiohttp": "3.8.1", "requests": "2.28.1", "urllib3": "1.26.12"},
+	}
+	model, _ = m.Update(msg2)
+	m = model.(Model)
+
+	msg1 := pm.PackageListMsg{
+		TabIndex: 1,
+		Packages: []string{"npm", "typescript"},
+		Versions: map[string]string{"npm": "8.19.2", "typescript": "4.8.4"},
+	}
+	model, _ = m.Update(msg1)
+	m = model.(Model)
+
+	m.activeTab = 0 // ALL tab
+	m.allMode = true
+	m = m.applyFilter()
+}
+
+func parseWingetListForTest(output string) ([]string, map[string]string) {
+	var names []string
+	versions := make(map[string]string)
+	lines := strings.Split(output, "\n")
+	
+	sepIdx := -1
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if len(trimmed) > 10 && strings.Count(trimmed, "-") > len(trimmed)/2 {
+			sepIdx = i
+			break
+		}
+	}
+	if sepIdx < 1 {
+		return nil, nil
+	}
+	
+	header := lines[sepIdx-1]
+	idIdx := strings.Index(header, "Id")
+	if idIdx < 0 {
+		idIdx = strings.Index(header, "ID")
+	}
+	versionIdx := strings.Index(header, "Version")
+	if idIdx < 0 || versionIdx < 0 {
+		return nil, nil
+	}
+	
+	for i := sepIdx + 1; i < len(lines); i++ {
+		line := strings.TrimRight(lines[i], "\r\n")
+		if len(line) <= idIdx {
+			continue
+		}
+		
+		idEnd := versionIdx
+		if idEnd > len(line) {
+			idEnd = len(line)
+		}
+		id := strings.TrimSpace(line[idIdx:idEnd])
+		if id == "" {
+			continue
+		}
+		
+		version := ""
+		if len(line) > versionIdx {
+			availableIdx := strings.Index(header, "Available")
+			if availableIdx > versionIdx && availableIdx < len(line) {
+				version = strings.TrimSpace(line[versionIdx:availableIdx])
+			} else {
+				fields := strings.Fields(line[versionIdx:])
+				if len(fields) > 0 {
+					version = fields[0]
+				}
+			}
+		}
+		
+		if _, exists := versions[id]; !exists {
+			names = append(names, id)
+		}
+		versions[id] = version
+	}
+	return names, versions
+}
+
+func TestRenderMSIX(t *testing.T) {
+	m := New()
+	m.activeTab = 3
+	m.allMode = true
+	
+	// Create some packages including MSIX
+	pkgs := []string{
+		"ARP\\Machine\\X64\\O365HomePremRetail - en-gb",
+		"Google.Antigravity",
+		"MSIX\\5319275A.WhatsAppDesktop_2.2625.101.0_x64__cv1g1gvanyjgm",
+		"MSIX\\Microsoft.AV1VideoExtension_2.0.7.0_x64__8wekyb3d8bbwe",
+	}
+	
+	msg := pm.PackageListMsg{
+		TabIndex: 3,
+		Packages: pkgs,
+		Versions: map[string]string{
+			pkgs[0]: "1.0",
+			pkgs[1]: "2.3",
+			pkgs[2]: "2.26",
+			pkgs[3]: "2.0",
+		},
+	}
+	
+	model, _ := m.Update(msg)
+	m = model.(Model)
+	m.activeTab = 0
+	m.allMode = true
+	m = m.applyFilter()
+	
+	t.Logf("allDisplayPackages: %v", m.allDisplayPackages)
+	for i, pkg := range m.allDisplayPackages {
+		origin := m.allPackageOrigin[pkg]
+		maxPkgLen := 50 - 4 - 6
+		displayPkg := truncateString(pkg, maxPkgLen)
+		pkgRendered := ItemStyle.Render(displayPkg)
+		t.Logf("Item %d: pkg=%q, origin=%q, maxPkgLen=%d, displayPkg=%q (len=%d), pkgRendered=%q (len=%d)",
+			i, pkg, origin, maxPkgLen, displayPkg, len(displayPkg), pkgRendered, len(pkgRendered))
+	}
+	
+	panel := m.renderAllLeftPanel(50, 10)
+	t.Logf("Rendered panel:\n%s", panel)
 }
 
 
