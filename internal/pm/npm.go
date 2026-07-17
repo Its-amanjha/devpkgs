@@ -68,6 +68,9 @@ func (n *NpmManager) RunAction(name string, action Action, programChan chan<- te
 	if action == Remove {
 		return RunStream(programChan, name, action, "npm", "npm", "uninstall", "-g", name)
 	}
+	if action == Install {
+		return RunStream(programChan, name, action, "npm", "npm", "install", "-g", name)
+	}
 	return RunStream(programChan, name, action, "npm", "npm", "update", "-g", name)
 }
 
