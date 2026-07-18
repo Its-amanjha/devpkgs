@@ -4,7 +4,7 @@ A beautiful, high-performance, and lightweight terminal dashboard to manage all 
 
 Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and styled with [Lipgloss](https://github.com/charmbracelet/lipgloss).
 
----
+-----
 
 ## Features
 
@@ -15,7 +15,7 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and styled w
 * **Online Registry Search & Install**: Search npm, PyPI, WinGet, and Homebrew online registries from a unified Search tab, and download packages instantly.
 * **Custom Color Themes**: Switch between premium color schemes (e.g., Catppuccin Mocha, Gruvbox Dark, Tokyo Night) dynamically using a built-in theme picker modal.
 
----
+-----
 
 ## Keybindings & Navigation
 
