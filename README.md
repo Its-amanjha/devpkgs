@@ -57,7 +57,7 @@ Run the shell setup script:
 ./install.sh
 ```
 
----
+-----
 
 ## Development
 
@@ -76,7 +76,7 @@ Run dev console:
 go run .
 ```
 
----
+-----
 
 ## License
 MIT License. Created by Aman Kumar Jha. Independent maintenance and contributions are welcome.
